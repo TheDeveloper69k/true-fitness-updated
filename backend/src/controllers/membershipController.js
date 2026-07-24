@@ -305,6 +305,7 @@ exports.assignMembership = async (req, res) => {
       },
     });
   } catch (err) {
+    console.error("[assignMembership]", err);
     return res.status(500).json({
       success: false,
       message: "Server error while adding membership",
@@ -591,6 +592,7 @@ exports.renewMembership = async (req, res) => {
     });
 
   } catch (err) {
+    console.error("[renewMembership]", err);
     return res.status(500).json({
       success: false,
       message: "Server error while renewing membership",
@@ -755,6 +757,7 @@ exports.modifyMembership = async (req, res) => {
       data,
     });
   } catch (err) {
+    console.error("[modifyMembership]", err);
     return res.status(500).json({
       success: false,
       message: "Server error while modifying membership",
