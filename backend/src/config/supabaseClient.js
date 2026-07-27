@@ -13,11 +13,6 @@ const supabase = createClient(supabaseUrl, supabaseKey, {
     autoRefreshToken: false,
     persistSession: false,
   },
-  global: {
-    fetch: (url, opts) => {
-      return fetch(url.replace('/rest/v1/', '/'), opts);
-    }
-  }
 });
 
 module.exports = supabase;

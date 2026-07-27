@@ -41,6 +41,13 @@ const registerCronJobs = () => {
   } catch (err) {
     console.error("[Cron] Failed to register biometric cron:", err.message);
   }
+
+  try {
+    require("./cron/membershipStatusJob");
+    console.log("[Cron] Membership status sync job registered");
+  } catch (err) {
+    console.error("[Cron] Failed to register membership status job:", err.message);
+  }
 };
 
 // ─── Start Server ─────────────────────────────────────────────────────────────

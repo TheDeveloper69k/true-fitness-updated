@@ -17,6 +17,25 @@ function addDays(startDate, days) {
   return d.toISOString().split("T")[0];
 }
 
+async function expireStaleMemberships() {
+  const todayStr = new Date().toISOString().split("T")[0];
+
+  const { error } = await supabase
+    .from("user_memberships")
+    .update({
+      status: "expired",
+      updated_at: new Date().toISOString(),
+    })
+    .lt("end_date", todayStr)
+    .eq("status", "active");
+
+  if (error) {
+    console.error("[expireStaleMemberships]", error.message);
+  }
+}
+
+exports.expireStaleMemberships = expireStaleMemberships;
+
 async function getPlanByName(planName) {
   const { data, error } = await supabase
     .from("membership_plans")
@@ -319,16 +338,7 @@ exports.getAllMemberships = async (req, res) => {
   try {
     const { status, limit, user_id, latest_only } = req.query;
 
-    const todayStr = new Date().toISOString().split("T")[0];
-
-    await supabase
-      .from("user_memberships")
-      .update({
-        status: "expired",
-        updated_at: new Date().toISOString(),
-      })
-      .lt("end_date", todayStr)
-      .eq("status", "active");
+    await expireStaleMemberships();
 
     let query = supabase
       .from("user_memberships")
@@ -769,24 +779,7 @@ exports.modifyMembership = async (req, res) => {
 // Admin: stats
 exports.getMembershipStats = async (req, res) => {
   try {
-    const todayStr = new Date().toISOString().split("T")[0];
-
-    const { error: expireError } = await supabase
-      .from("user_memberships")
-      .update({
-        status: "expired",
-        updated_at: new Date().toISOString(),
-      })
-      .lt("end_date", todayStr)
-      .eq("status", "active");
-
-    if (expireError) {
-      return res.status(500).json({
-        success: false,
-        message: "Failed to refresh expired memberships",
-        error: expireError.message,
-      });
-    }
+    await expireStaleMemberships();
 
     const { data, error } = await supabase
       .from("user_memberships")
