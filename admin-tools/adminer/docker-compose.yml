@@ -1,0 +1,17 @@
+services:
+  adminer:
+    image: adminer:latest
+    restart: unless-stopped
+    ports:
+      # 127.0.0.1 only — never expose this port publicly.
+      # Reach it via an SSH tunnel (see ../README.md).
+      - "127.0.0.1:8081:8080"
+    environment:
+      # If Postgres runs in another Docker container on a shared network,
+      # set this to that container's service name instead.
+      ADMINER_DEFAULT_SERVER: ${DB_HOST:-host.docker.internal}
+      ADMINER_DESIGN: "pepa-linha-dark"
+    extra_hosts:
+      # Lets the container reach Postgres running directly on the host
+      # (i.e. not itself in Docker). Requires Docker 20.10+.
+      - "host.docker.internal:host-gateway"

@@ -1,0 +1,100 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>TrueFitness Deploy Dashboard</title>
+<style>
+  body { font-family: system-ui, sans-serif; max-width: 720px; margin: 40px auto; padding: 0 16px; background:#0b0f14; color:#e6edf3; }
+  h1 { font-size: 1.3rem; }
+  button { padding: 10px 16px; margin: 6px 6px 6px 0; border-radius: 6px; border: 1px solid #30363d; background:#21262d; color:#e6edf3; cursor:pointer; font-size: 0.95rem; }
+  button:hover { background:#30363d; }
+  button:disabled { opacity: 0.5; cursor: not-allowed; }
+  input[type=password] { padding: 8px; width: 260px; border-radius:6px; border:1px solid #30363d; background:#0d1117; color:#e6edf3; }
+  pre { background:#0d1117; border:1px solid #30363d; border-radius:6px; padding:12px; white-space:pre-wrap; word-break:break-word; max-height: 420px; overflow:auto; }
+  .row { margin-bottom: 16px; }
+  .hidden { display:none; }
+  .warn { color:#f0883e; font-size: 0.85rem; }
+</style>
+</head>
+<body>
+  <h1>TrueFitness Deploy Dashboard</h1>
+  <p class="warn">Local-only tool — reach it through an SSH tunnel. Never expose this port to the internet.</p>
+
+  <div id="loginBox" class="row">
+    <input id="tokenInput" type="password" placeholder="Admin token" autocomplete="off">
+    <button id="loginBtn">Unlock</button>
+    <div id="loginError" class="warn"></div>
+  </div>
+
+  <div id="controls" class="row hidden">
+    <button id="deployBtn">Deploy latest</button>
+    <button id="restartBtn">Restart backend</button>
+    <button id="logsBtn">View logs</button>
+    <button id="logoutBtn">Lock</button>
+  </div>
+
+  <pre id="output">Output will appear here.</pre>
+
+<script>
+const loginBox = document.getElementById("loginBox");
+const controls = document.getElementById("controls");
+const output = document.getElementById("output");
+const loginError = document.getElementById("loginError");
+
+async function call(url, opts) {
+  return fetch(url, { credentials: "same-origin", ...opts });
+}
+
+document.getElementById("loginBtn").onclick = async () => {
+  const token = document.getElementById("tokenInput").value;
+  loginError.textContent = "";
+  const res = await call("/login", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ token }),
+  });
+  if (res.ok) {
+    loginBox.classList.add("hidden");
+    controls.classList.remove("hidden");
+  } else {
+    const data = await res.json().catch(() => ({}));
+    loginError.textContent = data.error || "Login failed";
+  }
+};
+
+document.getElementById("logoutBtn").onclick = async () => {
+  await call("/logout", { method: "POST" });
+  controls.classList.add("hidden");
+  loginBox.classList.remove("hidden");
+  output.textContent = "Output will appear here.";
+};
+
+async function runAction(btnId, url) {
+  const btn = document.getElementById(btnId);
+  btn.disabled = true;
+  output.textContent = "Running...";
+  try {
+    const res = await call(url, { method: "POST" });
+    if (res.status === 401) {
+      controls.classList.add("hidden");
+      loginBox.classList.remove("hidden");
+      output.textContent = "Session expired. Log in again.";
+      return;
+    }
+    const data = await res.json();
+    output.textContent =
+      `exit code: ${data.exitCode}\n\n--- stdout ---\n${data.stdout || "(empty)"}\n\n--- stderr ---\n${data.stderr || "(empty)"}`;
+  } catch (e) {
+    output.textContent = "Request failed: " + e.message;
+  } finally {
+    btn.disabled = false;
+  }
+}
+
+document.getElementById("deployBtn").onclick = () => runAction("deployBtn", "/api/deploy");
+document.getElementById("restartBtn").onclick = () => runAction("restartBtn", "/api/restart");
+document.getElementById("logsBtn").onclick = () => runAction("logsBtn", "/api/logs");
+</script>
+</body>
+</html>
