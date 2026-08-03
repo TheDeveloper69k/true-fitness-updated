@@ -9,6 +9,39 @@ const getReceipts = async (req, res) => {
         limit = parseInt(limit) || 20;
         const offset = (page - 1) * limit;
 
+        // Resolve search term to matching user ids / a payment id BEFORE paginating,
+        // so a match on an older page isn't hidden by the current page's slice.
+        let matchedUserIds = null;
+        let matchedPaymentId = null;
+
+        if (search) {
+            const q = search.trim();
+
+            const { data: matchedUsers, error: userSearchError } = await supabase
+                .from("users")
+                .select("id")
+                .or(`name.ilike.%${q}%,phone.ilike.%${q}%`);
+
+            if (userSearchError) {
+                console.error("[GetReceipts] User search error:", userSearchError);
+                return res.status(500).json({ success: false, message: "Failed to search receipts" });
+            }
+
+            matchedUserIds = (matchedUsers || []).map((u) => u.id);
+
+            if (/^\d+$/.test(q)) {
+                matchedPaymentId = parseInt(q, 10);
+            }
+
+            if (matchedUserIds.length === 0 && matchedPaymentId === null) {
+                return res.status(200).json({
+                    success: true,
+                    data: [],
+                    pagination: { total: 0, page, limit, pages: 0 },
+                });
+            }
+        }
+
         // Base query — join payments → users → membership_plans
         let query = supabase
             .from("payments")
@@ -26,8 +59,14 @@ const getReceipts = async (req, res) => {
         plan:membership_plans!payments_plan_id_fkey ( id, name, duration_days, price )
       `, { count: "exact" })
             .eq("status", "success")
-            .order("payment_date", { ascending: false })
-            .range(offset, offset + limit - 1);
+            .order("payment_date", { ascending: false });
+
+        if (search) {
+            const orParts = [];
+            if (matchedUserIds.length > 0) orParts.push(`user_id.in.(${matchedUserIds.join(",")})`);
+            if (matchedPaymentId !== null) orParts.push(`id.eq.${matchedPaymentId}`);
+            query = query.or(orParts.join(","));
+        }
 
         // Date filters
         if (from) query = query.gte("payment_date", new Date(from).toISOString());
@@ -37,6 +76,8 @@ const getReceipts = async (req, res) => {
             query = query.lte("payment_date", toEnd.toISOString());
         }
 
+        query = query.range(offset, offset + limit - 1);
+
         const { data, error, count } = await query;
 
         if (error) {
@@ -44,20 +85,9 @@ const getReceipts = async (req, res) => {
             return res.status(500).json({ success: false, message: "Failed to fetch receipts" });
         }
 
-        // Client-side search filter (Supabase free tier doesn't support cross-table ilike easily)
-        let filtered = data || [];
-        if (search) {
-            const q = search.toLowerCase();
-            filtered = filtered.filter(r =>
-                r.user?.name?.toLowerCase().includes(q) ||
-                r.user?.phone?.includes(q) ||
-                String(r.id).includes(q)
-            );
-        }
-
         return res.status(200).json({
             success: true,
-            data: filtered,
+            data: data || [],
             pagination: {
                 total: count,
                 page,
