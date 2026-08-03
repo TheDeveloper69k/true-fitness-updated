@@ -219,10 +219,10 @@ function setMemberFilter(filter) {
 }
 
 async function loadMembers(targetTbodyId = "memberBody") {
-  let endpoint = "/memberships?limit=100";
+  let endpoint = "/memberships";
 
   if (currentMemberFilter !== "all") {
-    endpoint += `&status=${encodeURIComponent(currentMemberFilter)}`;
+    endpoint += `?status=${encodeURIComponent(currentMemberFilter)}`;
   }
 
   const res = await API.get(endpoint);

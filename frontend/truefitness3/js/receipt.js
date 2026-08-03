@@ -123,15 +123,23 @@ function receiptsClearFilter() {
 }
 
 // ─── Receipt Preview Modal ────────────────────────────────────
+let _receiptPreviewRequestId = 0;
+
 async function openReceiptPreview(id) {
     const modal = document.getElementById('receiptPreviewModal');
     if (!modal) return;
+
+    const requestToken = ++_receiptPreviewRequestId;
 
     document.getElementById('receiptPreviewBody').innerHTML =
         `<div class="r-loading">Loading receipt…</div>`;
     modal.classList.add('open');
 
     const res = await API.get(`/receipts/${id}`);
+
+    // A newer preview request was started while this one was in flight — discard this result.
+    if (requestToken !== _receiptPreviewRequestId) return;
+
     if (!res?.ok) {
         document.getElementById('receiptPreviewBody').innerHTML =
             `<div class="r-loading">Failed to load receipt.</div>`;
@@ -147,6 +155,18 @@ async function openReceiptPreview(id) {
 function closeReceiptPreview() {
     document.getElementById('receiptPreviewModal')?.classList.remove('open');
 }
+
+// Close on backdrop click or Escape key
+document.getElementById('receiptPreviewModal')?.addEventListener('click', (e) => {
+    if (e.target.id === 'receiptPreviewModal') closeReceiptPreview();
+});
+
+document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape' &&
+        document.getElementById('receiptPreviewModal')?.classList.contains('open')) {
+        closeReceiptPreview();
+    }
+});
 
 // ─── Build Receipt HTML (used in preview + PDF) ───────────────
 function buildReceiptHTML(r) {

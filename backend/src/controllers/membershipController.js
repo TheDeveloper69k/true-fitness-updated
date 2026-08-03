@@ -282,13 +282,13 @@ exports.assignMembership = async (req, res) => {
       user_id: resolvedUserId,
       amount: finalAmount,
       status: "success",              // ✅ matches your DB  constraint
-      payment_date: new Date().toISOString(),
+      payment_date: new Date(normalizedStartDate).toISOString(),
       plan_id: plan.id,
       gym_id: gym_id || null,
       currency: currency || "INR",
       payment_method: payment_method || "cash",
       transaction_id: transaction_id || `TF-${Date.now()}`,
-      paid_at: new Date().toISOString(),
+      paid_at: new Date(normalizedStartDate).toISOString(),
       updated_at: new Date().toISOString(),
       membership_end_date: resolvedEndDate,
     };
@@ -575,13 +575,13 @@ exports.renewMembership = async (req, res) => {
       user_id: existingMembership.user_id || null,
       amount: finalAmount,
       status: "success",
-      payment_date: new Date().toISOString(),
+      payment_date: new Date(newStartDate).toISOString(),
       plan_id: plan.id,
       gym_id: existingMembership.gym_id || null,
       currency: req.body.currency || "INR",
       payment_method: req.body.payment_method || "cash",
       transaction_id: req.body.transaction_id || `TF-${Date.now()}`,
-      paid_at: new Date().toISOString(),
+      paid_at: new Date(newStartDate).toISOString(),
       updated_at: new Date().toISOString(),
       membership_end_date: newEndDate, // ✅ actual end date with rollover
     };
