@@ -432,8 +432,10 @@ const sendMembershipExpiryAlerts = async (daysBeforeExpiry = 3) => {
       });
     }
 
-    if (records.length > 0)
-      await supabase.from("whatsapp_notifications").insert(records);
+    if (records.length > 0) {
+      const { error: logError } = await supabase.from("whatsapp_notifications").insert(records);
+      if (logError) console.error("[ExpiryAlert] Failed to log notifications:", logError.message);
+    }
 
     console.log(`[ExpiryAlert] Done — sent: ${results.sent}, failed: ${results.failed}, skipped: ${results.skipped}`);
     return { success: true, ...results };
