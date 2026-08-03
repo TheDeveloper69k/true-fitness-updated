@@ -1,4 +1,5 @@
 const supabase = require("../config/supabaseClient");
+const { sendMembershipConfirmation } = require("./whatsappController");
 
 const ALLOWED_STATUS = ["active", "inactive", "expired", "cancelled", "suspended"];
 
@@ -315,6 +316,18 @@ exports.assignMembership = async (req, res) => {
       });
     }
 
+    sendMembershipConfirmation({
+      userId: resolvedUserId,
+      name: resolvedName,
+      phone: resolvedPhone,
+      plan: plan.name,
+      amount: finalAmount,
+      startDate: normalizedStartDate,
+      endDate: resolvedEndDate,
+      paymentMethod: payment_method,
+      isRenewal: false,
+    }).catch((err) => console.error("[assignMembership] WhatsApp confirmation error:", err.message));
+
     return res.status(201).json({
       success: true,
       message: "Membership added and receipt created successfully",
@@ -593,6 +606,18 @@ exports.renewMembership = async (req, res) => {
     if (paymentError) {
       console.error("Receipt creation failed after renewal:", paymentError.message);
     }
+
+    sendMembershipConfirmation({
+      userId: existingMembership.user_id,
+      name: existingMembership.full_name,
+      phone: existingMembership.phone,
+      plan: plan.name,
+      amount: finalAmount,
+      startDate: newStartDate,
+      endDate: newEndDate,
+      paymentMethod: req.body.payment_method,
+      isRenewal: true,
+    }).catch((err) => console.error("[renewMembership] WhatsApp confirmation error:", err.message));
 
     // ✅ Single final return
     return res.status(200).json({

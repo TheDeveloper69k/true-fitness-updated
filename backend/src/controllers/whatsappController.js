@@ -339,6 +339,71 @@ const broadcast = async (req, res) => {
 };
 
 // ═════════════════════════════════════════════════════════════════════════════
+// MEMBERSHIP CONFIRMATION — called after assign/renew
+// ═════════════════════════════════════════════════════════════════════════════
+const sendMembershipConfirmation = async ({
+  userId, name, phone, plan, amount, startDate, endDate, paymentMethod, isRenewal,
+}) => {
+  try {
+    if (!phone) return { success: false, error: "No phone number" };
+
+    const title = isRenewal ? "Membership Renewed" : "Membership Confirmed";
+    const fields = [
+      `Name: ${name}`,
+      `Phone: ${phone}`,
+      `Plan: ${plan}`,
+      `Amount Paid: ₹${Number(amount || 0).toLocaleString("en-IN")}`,
+      `Joining Date: ${formatDateForUser(startDate)}`,
+      `Expiry Date: ${formatDateForUser(endDate)}`,
+      `Payment Mode: ${(paymentMethod || "cash").toUpperCase()}`,
+    ];
+    // Stored/logged with real line breaks for readability...
+    const details = fields.join("\n");
+    // ...but WhatsApp template variables reject newlines, so the sent
+    // message uses a flat separator instead.
+    const detailsFlat = fields.join(" | ");
+
+    let provider_message_id = null;
+    let status = "sent";
+    let error_message = null;
+    let sent_at = null;
+
+    try {
+      provider_message_id = await sendWhatsAppTemplate(
+        phone,
+        process.env.TWILIO_TEMPLATE_PERSONAL,
+        { "1": name, "2": `${title} - ${detailsFlat}` }
+      );
+      sent_at = new Date().toISOString();
+      console.log(`[MembershipConfirmation] Sent to ${name} — SID: ${provider_message_id}`);
+    } catch (smsErr) {
+      status = "failed";
+      error_message = smsErr.message;
+      console.error(`[MembershipConfirmation] Failed for ${name}:`, smsErr.message);
+    }
+
+    const { error: logError } = await supabase.from("whatsapp_notifications").insert([{
+      user_id: userId || null,
+      title,
+      message: details,
+      target_type: "user",
+      status,
+      provider_message_id,
+      sent_at,
+      error_message,
+      created_by: null,
+      updated_at: new Date().toISOString(),
+    }]);
+    if (logError) console.error("[MembershipConfirmation] Failed to log notification:", logError.message);
+
+    return { success: status === "sent", error: error_message };
+  } catch (err) {
+    console.error("[MembershipConfirmation] Unexpected error:", err);
+    return { success: false, error: err.message };
+  }
+};
+
+// ═════════════════════════════════════════════════════════════════════════════
 // MEMBERSHIP EXPIRY ALERTS — called by cron
 // ═════════════════════════════════════════════════════════════════════════════
 const sendMembershipExpiryAlerts = async (daysBeforeExpiry = 3) => {
@@ -654,5 +719,6 @@ const triggerExpiryAlerts = async (req, res) => {
 module.exports = {
   sendToUser, sendBulk, broadcast, retryFailed,
   getAllNotifications, getMyNotifications, getStats,
-  deleteNotification, sendMembershipExpiryAlerts, triggerExpiryAlerts,handleIncomingMessage,
+  deleteNotification, sendMembershipExpiryAlerts, triggerExpiryAlerts, handleIncomingMessage,
+  sendMembershipConfirmation,
 };
