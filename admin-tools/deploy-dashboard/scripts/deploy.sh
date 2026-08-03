@@ -2,8 +2,8 @@
 set -euo pipefail
 
 # EDIT these two values to match your server.
-REPO_PATH="/path/to/true-fitness-updated"
-SERVICE_NAME="truefitness-backend"   # pm2 process name, or systemd unit name
+REPO_PATH="/home/exdep/truefitness"
+SERVICE_NAME="truefitness"   # pm2 process name, or systemd unit name
 
 cd "$REPO_PATH"
 git pull origin main
