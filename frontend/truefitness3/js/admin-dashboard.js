@@ -320,7 +320,7 @@ function renderMemberTable(tbodyId, rows, filter = "all") {
       const phone = m.phone || "-";
       const safePhone = highlightMatch(phone, hlQuery);
       const dob = formatDate(m.date_of_birth);
-      const joiningDate = formatDate(m.created_at);
+      const joiningDate = formatDate(m.start_date);
       const plan = escapeHtml(m.monthly_plan || "-");
       const amount = Number(m.final_amount ?? 0);
 
