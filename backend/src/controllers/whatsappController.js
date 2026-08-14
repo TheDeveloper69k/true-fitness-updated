@@ -23,6 +23,12 @@ const formatPhone = (phone) => {
 
   return `+${cleaned}`;  // anything else — just add +
 };
+// WhatsApp template variables reject newlines, tabs, and runs of 4+ spaces —
+// Meta silently fails the whole send (error 21656) if a variable contains
+// them. Free-text admin messages routinely have line breaks, so every value
+// that goes into a template variable must be flattened through this first.
+const sanitizeForTemplate = (text) => String(text || "").replace(/\s+/g, " ").trim();
+
 // ─── Send using approved Meta template ───────────────────────────────────────
 const sendWhatsAppTemplate = async (phone, contentSid, variables) => {
   const formatted = formatPhone(phone);
@@ -118,7 +124,7 @@ const sendToUser = async (req, res) => {
       provider_message_id = await sendWhatsAppTemplate(
         user.phone,
         process.env.TWILIO_TEMPLATE_PERSONAL,
-        { "1": user.name, "2": `${title} - ${message}` }
+        { "1": user.name, "2": sanitizeForTemplate(`${title} - ${message}`) }
       );
       sent_at = new Date().toISOString();
       console.log("[SendToUser] WhatsApp sent. SID:", provider_message_id);
@@ -180,7 +186,7 @@ const sendTemplateToUsersInBackground = async (users, { title, message, targetTy
       provider_message_id = await sendWhatsAppTemplate(
         user.phone,
         templateSid,
-        { "1": user.name, "2": `${title} - ${message}` }
+        { "1": user.name, "2": sanitizeForTemplate(`${title} - ${message}`) }
       );
       sent_at = new Date().toISOString();
       results.sent++;
@@ -472,8 +478,8 @@ const sendMembershipExpiryAlerts = async (daysBeforeExpiry = 3) => {
           phone,
           process.env.TWILIO_TEMPLATE_EXPIRY,
           {
-            "1": name,
-            "2": plan,
+            "1": sanitizeForTemplate(name),
+            "2": sanitizeForTemplate(plan),
             "3": prettyExpiry,
           }
         );
@@ -543,7 +549,7 @@ const retryFailed = async (req, res) => {
       provider_message_id = await sendWhatsAppTemplate(
         user.phone,
         process.env.TWILIO_TEMPLATE_PERSONAL,
-        { "1": user.name, "2": `${notif.title} - ${notif.message}` }
+        { "1": user.name, "2": sanitizeForTemplate(`${notif.title} - ${notif.message}`) }
       );
       sent_at = new Date().toISOString();
     } catch (smsErr) {
