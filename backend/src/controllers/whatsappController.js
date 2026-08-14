@@ -160,6 +160,52 @@ const sendToUser = async (req, res) => {
 };
 
 // ═════════════════════════════════════════════════════════════════════════════
+// Fire off a WhatsApp template to many users in the background.
+// Sequentially awaiting a Twilio call per recipient can easily take longer
+// than the server's HTTP timeout once the recipient list gets into the
+// hundreds, so bulk/broadcast sends never await this — they respond as soon
+// as the recipient list is known, and this runs after the response is sent.
+// ═════════════════════════════════════════════════════════════════════════════
+const sendTemplateToUsersInBackground = async (users, { title, message, targetType, templateSid, createdBy, logLabel }) => {
+  const results = { sent: 0, failed: 0 };
+  const records = [];
+
+  for (const user of users) {
+    let provider_message_id = null;
+    let status = "sent";
+    let error_message = null;
+    let sent_at = null;
+
+    try {
+      provider_message_id = await sendWhatsAppTemplate(
+        user.phone,
+        templateSid,
+        { "1": user.name, "2": `${title} - ${message}` }
+      );
+      sent_at = new Date().toISOString();
+      results.sent++;
+    } catch (smsErr) {
+      status = "failed";
+      error_message = smsErr.message;
+      results.failed++;
+    }
+
+    records.push({
+      user_id: user.id, title, message,
+      target_type: targetType, status, provider_message_id,
+      sent_at, error_message, created_by: createdBy,
+      updated_at: new Date().toISOString(),
+    });
+  }
+
+  const { error: logError } = await supabase.from("whatsapp_notifications").insert(records);
+  if (logError) console.error(`[${logLabel}] Failed to log notifications:`, logError.message);
+
+  console.log(`[${logLabel}] Done — sent: ${results.sent}, failed: ${results.failed}, total: ${users.length}`);
+  return results;
+};
+
+// ═════════════════════════════════════════════════════════════════════════════
 // SEND BULK  →  POST /api/v1/whatsapp/send-bulk
 // ═════════════════════════════════════════════════════════════════════════════
 const sendBulk = async (req, res) => {
@@ -204,48 +250,24 @@ const sendBulk = async (req, res) => {
       });
     }
 
-    const results = { sent: 0, failed: 0, errors: [] };
-    const records = [];
-
-    for (const user of users) {
-      let provider_message_id = null;
-      let status = "sent";
-      let error_message = null;
-      let sent_at = null;
-
-      try {
-        provider_message_id = await sendWhatsAppTemplate(
-          user.phone,
-          process.env.TWILIO_TEMPLATE_BROADCAST,
-          { "1": user.name, "2": `${title} - ${message}` }
-        );
-        sent_at = new Date().toISOString();
-        results.sent++;
-      } catch (smsErr) {
-        status = "failed";
-        error_message = smsErr.message;
-        results.failed++;
-        results.errors.push({ user_id: user.id, name: user.name, error: smsErr.message });
-      }
-
-      records.push({
-        user_id: user.id, title, message,
-        target_type: "bulk", status, provider_message_id,
-        sent_at, error_message, created_by: req.user.id,
-        updated_at: new Date().toISOString(),
-      });
-    }
-
-    await supabase.from("whatsapp_notifications").insert(records);
-
-    return res.status(200).json({
+    res.status(202).json({
       success: true,
-      message: `Bulk send complete — ${results.sent} sent, ${results.failed} failed`,
-      data: { total: users.length, sent: results.sent, failed: results.failed },
+      message: `Bulk send started for ${users.length} recipient(s)`,
+      data: { total: users.length },
     });
+
+    sendTemplateToUsersInBackground(users, {
+      title, message,
+      targetType: "bulk",
+      templateSid: process.env.TWILIO_TEMPLATE_BROADCAST,
+      createdBy: req.user.id,
+      logLabel: "SendBulk",
+    }).catch((err) => console.error("[SendBulk] Background send error:", err.message));
   } catch (err) {
     console.error("[SendBulk] Unexpected error:", err);
-    return res.status(500).json({ success: false, message: "Internal server error" });
+    if (!res.headersSent) {
+      res.status(500).json({ success: false, message: "Internal server error" });
+    }
   }
 };
 
@@ -293,48 +315,24 @@ const broadcast = async (req, res) => {
     if (!users || users.length === 0)
       return res.status(404).json({ success: false, message: "No active users found" });
 
-    const results = { sent: 0, failed: 0, errors: [] };
-    const records = [];
-
-    for (const user of users) {
-      let provider_message_id = null;
-      let status = "sent";
-      let error_message = null;
-      let sent_at = null;
-
-      try {
-        provider_message_id = await sendWhatsAppTemplate(
-          user.phone,
-          process.env.TWILIO_TEMPLATE_BROADCAST,
-          { "1": user.name, "2": `${title} - ${message}` }
-        );
-        sent_at = new Date().toISOString();
-        results.sent++;
-      } catch (smsErr) {
-        status = "failed";
-        error_message = smsErr.message;
-        results.failed++;
-        results.errors.push({ user_id: user.id, name: user.name, error: smsErr.message });
-      }
-
-      records.push({
-        user_id: user.id, title, message,
-        target_type: "all", status, provider_message_id,
-        sent_at, error_message, created_by: req.user.id,
-        updated_at: new Date().toISOString(),
-      });
-    }
-
-    await supabase.from("whatsapp_notifications").insert(records);
-
-    return res.status(200).json({
+    res.status(202).json({
       success: true,
-      message: `Broadcast complete — ${results.sent} sent, ${results.failed} failed`,
-      data: { total: users.length, sent: results.sent, failed: results.failed },
+      message: `Broadcast started for ${users.length} recipient(s)`,
+      data: { total: users.length },
     });
+
+    sendTemplateToUsersInBackground(users, {
+      title, message,
+      targetType: "all",
+      templateSid: process.env.TWILIO_TEMPLATE_BROADCAST,
+      createdBy: req.user.id,
+      logLabel: "Broadcast",
+    }).catch((err) => console.error("[Broadcast] Background send error:", err.message));
   } catch (err) {
     console.error("[Broadcast] Unexpected error:", err);
-    return res.status(500).json({ success: false, message: "Internal server error" });
+    if (!res.headersSent) {
+      res.status(500).json({ success: false, message: "Internal server error" });
+    }
   }
 };
 
