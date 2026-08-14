@@ -1,0 +1,20 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(node --check server.js)",
+      "Bash(git add *)",
+      "Bash(git commit -m ' *)",
+      "Bash(git push *)",
+      "Bash(ssh-keygen -V)",
+      "Bash(ls -la ~/.ssh/ 2>&1)",
+      "Read(//c/Users/hiten/.ssh/**)",
+      "Bash(cat ~/.ssh/id_ed25519_truefitness.pub)",
+      "Bash(cat ~/.ssh/config 2>&1)",
+      "Bash(ipconfig)",
+      "Bash(ping -n 3 -w 2000 192.168.0.201)",
+      "Bash(nslookup true-fitness.in)",
+      "Bash(powershell -Command \"Test-NetConnection -ComputerName 49.205.178.148 -Port 22 | Select-Object ComputerName,RemotePort,TcpTestSucceeded\")",
+      "Bash(powershell -Command \"Test-NetConnection -ComputerName 49.205.178.148 -Port 443 | Select-Object ComputerName,RemotePort,TcpTestSucceeded\")"
+    ]
+  }
+}
