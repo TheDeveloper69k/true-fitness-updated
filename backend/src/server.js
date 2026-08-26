@@ -22,6 +22,7 @@ const checkDatabaseConnection = async () => {
     console.log("[DB] Supabase connected successfully");
   } catch (err) {
     console.error("[DB] Supabase connection failed:", err.message);
+    console.error("[DB] Full error:", JSON.stringify(err, Object.getOwnPropertyNames(err)));
     process.exit(1);
   }
 };
