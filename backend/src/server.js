@@ -11,7 +11,7 @@ require("dotenv").config();
 const app = require("./app");
 const supabase = require("./config/supabaseClient");
 
-const PORT = 8000;
+const PORT = process.env.PORT || 8000;
 const NODE_ENV = process.env.NODE_ENV || "development";
 
 // ─── Check Supabase Connection ────────────────────────────────────────────────
@@ -66,12 +66,12 @@ const startServer = async () => {
     console.log(`  API Base    : http://localhost:${PORT}/api/v1`);
     console.log("─────────────────────────────────────────");
     try {
-  require("./cron/birthdayWishJob");
-  console.log("[Cron] Birthday wish job registered");
-} catch (err) {
-  console.error("[Cron] Failed to register birthday job:", err.message);
-}
-    
+      require("./cron/birthdayWishJob");
+      console.log("[Cron] Birthday wish job registered");
+    } catch (err) {
+      console.error("[Cron] Failed to register birthday job:", err.message);
+    }
+
   });
 
   // Set server timeouts
@@ -95,7 +95,7 @@ const startServer = async () => {
   };
 
   process.on("SIGTERM", () => shutdown("SIGTERM"));
-  process.on("SIGINT",  () => shutdown("SIGINT"));
+  process.on("SIGINT", () => shutdown("SIGINT"));
 
   process.on("unhandledRejection", (err) => {
     console.error("[UnhandledRejection]", err.message);
@@ -111,8 +111,8 @@ const startServer = async () => {
     setInterval(() => {
       const mem = process.memoryUsage();
       console.log("[Memory]", {
-        rss:       `${Math.round(mem.rss       / 1024 / 1024)}MB`,
-        heapUsed:  `${Math.round(mem.heapUsed  / 1024 / 1024)}MB`,
+        rss: `${Math.round(mem.rss / 1024 / 1024)}MB`,
+        heapUsed: `${Math.round(mem.heapUsed / 1024 / 1024)}MB`,
         heapTotal: `${Math.round(mem.heapTotal / 1024 / 1024)}MB`,
       });
     }, 30 * 60 * 1000);
