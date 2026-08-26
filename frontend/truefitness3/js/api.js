@@ -1,7 +1,7 @@
 // ── TRUE FITNESS — API FOUNDATION ──
 // FILE LOCATION: truefitness 3/js/api.js
 
-const API_BASE = 'https://true-fitness.in/api/v1';
+const API_BASE = 'https://true-fitness-updated-production.up.railway.app/api/v1';
 
 // ─────────────────────────────────────────────
 // TOKEN HELPERS
