@@ -1112,6 +1112,22 @@
           <button type="button" class="clear-search-btn" onclick="clearMemberSearch()">✕ Clear</button>
         </div>
 
+        <!-- ── Expiry Date Filter ── -->
+        <div class="members-search-row" style="margin-top:10px">
+          <div class="search-box" style="max-width:220px">
+            <span style="color:var(--muted);font-size:14px">📅</span>
+            <input type="date" id="expiryDateFilter"
+              style="background:transparent;border:none;color:#fff;outline:none;width:100%" />
+          </div>
+          <select id="dateFilterField"
+            style="padding:10px;border-radius:10px;border:1px solid var(--border);background:var(--card2);color:#fff">
+            <option value="end_date">Expiry Date</option>
+            <option value="start_date">Joining Date</option>
+          </select>
+          <button type="button" class="clear-search-btn" onclick="applyDateFilter()">Filter</button>
+          <button type="button" class="clear-search-btn" onclick="clearDateFilter()">✕ Clear</button>
+        </div>
+
         <!-- search result count info -->
         <div id="memberSearchInfo" class="search-result-info" style="display:none"></div>
 

@@ -4,6 +4,8 @@
 
 let memberSortKey = "start_date";  // default sort
 let memberSortDir = "desc";        // "asc" or "desc"
+let dateFilterValue = null;
+let dateFilterField = null;
 
 const setText = (id, val) => {
   const el = document.getElementById(id);
@@ -307,6 +309,30 @@ function highlightMatch(text, query) {
   );
 }
 
+function applyDateFilter() {
+  const dateInput = document.getElementById("expiryDateFilter");
+  const fieldSelect = document.getElementById("dateFilterField");
+  const val = dateInput?.value || "";
+
+  if (!val) {
+    showToast("Please pick a date first", "error");
+    return;
+  }
+
+  dateFilterValue = val;               // format: YYYY-MM-DD
+  dateFilterField = fieldSelect?.value || "end_date";
+
+  renderMemberTable("memberBody", cachedMemberRows, currentMemberFilter);
+}
+
+function clearDateFilter() {
+  dateFilterValue = null;
+  dateFilterField = null;
+  const dateInput = document.getElementById("expiryDateFilter");
+  if (dateInput) dateInput.value = "";
+  renderMemberTable("memberBody", cachedMemberRows, currentMemberFilter);
+}
+
 function renderMemberTable(tbodyId, rows, filter = "all") {
   const tbody = document.getElementById(tbodyId);
   if (!tbody) return;
@@ -322,12 +348,25 @@ function renderMemberTable(tbodyId, rows, filter = "all") {
     });
   }
 
+  if (isSearchable && dateFilterValue && dateFilterField) {
+    filtered = filtered.filter((m) => {
+      const rawDate = m[dateFilterField];
+      if (!rawDate) return false;
+      const normalized = new Date(rawDate).toISOString().split("T")[0];
+      return normalized === dateFilterValue;
+    });
+  }
+
   if (isSearchable) {
     const infoEl = document.getElementById("memberSearchInfo");
     if (infoEl) {
       if (membersSearchQuery) {
         infoEl.style.display = "block";
         infoEl.innerHTML = `Showing <strong>${filtered.length}</strong> of <strong>${rows.length}</strong> members for &ldquo;<strong>${escapeHtml(membersSearchQuery)}</strong>&rdquo;`;
+      } else if (dateFilterValue && dateFilterField) {
+        const fieldLabel = dateFilterField === "end_date" ? "Expiry Date" : "Joining Date";
+        infoEl.style.display = "block";
+        infoEl.innerHTML = `Showing <strong>${filtered.length}</strong> of <strong>${rows.length}</strong> members with <strong>${fieldLabel}</strong> = <strong>${new Date(dateFilterValue).toLocaleDateString("en-IN")}</strong>`;
       } else {
         infoEl.style.display = "none";
       }
