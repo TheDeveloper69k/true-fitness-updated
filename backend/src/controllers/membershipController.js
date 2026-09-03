@@ -19,7 +19,10 @@ function addDays(startDate, days) {
 }
 
 async function expireStaleMemberships() {
-  const todayStr = new Date().toISOString().split("T")[0];
+  const now = new Date();
+  const istOffsetMs = 5.5 * 60 * 60 * 1000; // IST = UTC+5:30
+  const istNow = new Date(now.getTime() + istOffsetMs);
+  const todayStr = istNow.toISOString().split("T")[0];
 
   const { error } = await supabase
     .from("user_memberships")
@@ -855,7 +858,7 @@ exports.getMembershipStats = async (req, res) => {
       message: "Server error while fetching membership stats",
       error: err.message,
     });
-    
+
   }
 };
 // Admin: delete member (user + their memberships)
