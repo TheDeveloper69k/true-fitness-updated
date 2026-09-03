@@ -107,6 +107,7 @@ function setMemberSort(key) {
     memberSortDir = "asc";
   }
   renderMemberTable("memberBody", cachedMemberRows, currentMemberFilter);
+  renderMemberTable("dashMemberBody", cachedMemberRows, currentMemberFilter);
 }
 
 function sortMemberRows(rows) {
