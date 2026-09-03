@@ -2,6 +2,9 @@
 //  Utilities
 // ─────────────────────────────────────────────
 
+let memberSortKey = "start_date";  // default sort
+let memberSortDir = "desc";        // "asc" or "desc"
+
 const setText = (id, val) => {
   const el = document.getElementById(id);
   if (el) el.textContent = val;
@@ -53,9 +56,9 @@ function navigate(page, el = null) {
     loadAdminPlans();
   }
   if (page === "diet") {
-  initWeeklyDietBuilder();
-  loadDiet("all");
-}
+    initWeeklyDietBuilder();
+    loadDiet("all");
+  }
   if (page === "receipts") loadReceipts(1);
   if (page === "gym-plans") loadGymPlans();
 }
@@ -96,6 +99,52 @@ function handleSearch(value) {
 // ─────────────────────────────────────────────
 //  Members page — dedicated search
 // ─────────────────────────────────────────────
+function setMemberSort(key) {
+  if (memberSortKey === key) {
+    memberSortDir = memberSortDir === "asc" ? "desc" : "asc";
+  } else {
+    memberSortKey = key;
+    memberSortDir = "asc";
+  }
+  renderMemberTable("memberBody", cachedMemberRows, currentMemberFilter);
+}
+
+function sortMemberRows(rows) {
+  const sorted = [...rows];
+  sorted.sort((a, b) => {
+    let valA = a[memberSortKey];
+    let valB = b[memberSortKey];
+
+    // Handle name specially (could be name or full_name)
+    if (memberSortKey === "name") {
+      valA = a.name || a.full_name || "";
+      valB = b.name || b.full_name || "";
+    }
+
+    // Dates
+    if (["start_date", "end_date", "date_of_birth"].includes(memberSortKey)) {
+      valA = valA ? new Date(valA).getTime() : 0;
+      valB = valB ? new Date(valB).getTime() : 0;
+    }
+
+    // Numbers
+    if (memberSortKey === "final_amount") {
+      valA = Number(valA || 0);
+      valB = Number(valB || 0);
+    }
+
+    // Strings
+    if (typeof valA === "string" && typeof valB === "string") {
+      valA = valA.toLowerCase();
+      valB = valB.toLowerCase();
+    }
+
+    if (valA < valB) return memberSortDir === "asc" ? -1 : 1;
+    if (valA > valB) return memberSortDir === "asc" ? 1 : -1;
+    return 0;
+  });
+  return sorted;
+}
 
 function debouncedMemberSearch(value) {
   clearTimeout(memberSearchTimer);
@@ -283,6 +332,7 @@ function renderMemberTable(tbodyId, rows, filter = "all") {
       }
     }
   }
+  filtered = sortMemberRows(filtered);
 
   if (!filtered.length) {
     let emptyText;
@@ -296,7 +346,7 @@ function renderMemberTable(tbodyId, rows, filter = "all") {
 
     tbody.innerHTML = `
       <tr>
-        <td colspan="8" style="text-align:center;padding:20px;color:gray">
+        <td colspan="10" style="text-align:center;padding:20px;color:gray">
           ${emptyText}
         </td>
       </tr>`;
@@ -323,6 +373,7 @@ function renderMemberTable(tbodyId, rows, filter = "all") {
       const joiningDate = formatDate(m.start_date);
       const plan = escapeHtml(m.monthly_plan || "-");
       const amount = Number(m.final_amount ?? 0);
+      const expiryDate = formatDate(m.end_date);
 
       // user_id = actual user, m.id = membership row
       const deleteUserId = m.user_id || m.id;
@@ -336,7 +387,8 @@ function renderMemberTable(tbodyId, rows, filter = "all") {
         <td>${joiningDate}</td>
         <td>${plan}</td>
         <td>₹${amount.toLocaleString("en-IN")}</td>
-        <td><span class="pill pill-${statusClass}">${capitalize(m.status || "—")}</span></td>
+        <td>${expiryDate}</td>
+        <td><span class="pill pill-${statusClass}">${capitalize(m.status || "—")}</span></td>       
         <td>
           <div style="display:flex;gap:6px;flex-wrap:wrap">
             <button class="tc-btn" onclick="openStatusModal(${m.id}, '${m.status || "active"}')">✏️ Status</button>
@@ -703,20 +755,20 @@ async function assignMembership(userId, assigned = false) {
   const status = document.getElementById("memberStatus")?.value || "active";
   const start_date = document.getElementById("startDate")?.value || "";
   const payment_method =
-  document.getElementById("paymentMethod").value;
+    document.getElementById("paymentMethod").value;
 
   if (!monthly_plan) return showToast("Plan name is required", "error");
   if (!start_date) return showToast("Start date is required", "error");
 
   const payload = {
-  user_id: parseInt(userId, 10),
-  monthly_plan,
-  discount: parseFloat(discount || 0),
-  date_of_birth,
-  status,
-  start_date,
-  payment_method,
-};
+    user_id: parseInt(userId, 10),
+    monthly_plan,
+    discount: parseFloat(discount || 0),
+    date_of_birth,
+    status,
+    start_date,
+    payment_method,
+  };
 
   const res = await API.post("/memberships/assign", payload);
 
@@ -1661,7 +1713,7 @@ async function sendNotification() {
     }),
   };
 
-  await API.post("/notifications", notifPayload).catch(() => {});
+  await API.post("/notifications", notifPayload).catch(() => { });
 
   showToast("✅ WhatsApp message sent!", "success");
   closeModal();
@@ -1936,11 +1988,11 @@ window.deleteNotifConfirm = deleteNotifConfirm;
 
 async function searchUserForDiet(value) {
   const resultBox = document.getElementById("dietUserResult");
-  const hiddenId  = document.getElementById("dietUserId");
+  const hiddenId = document.getElementById("dietUserId");
 
   if (!value || value.length < 3) {
     if (resultBox) resultBox.innerHTML = "";
-    if (hiddenId)  hiddenId.value = "";
+    if (hiddenId) hiddenId.value = "";
     return;
   }
 
@@ -1950,7 +2002,7 @@ async function searchUserForDiet(value) {
 
   if (!res?.ok || !res.data?.data) {
     if (resultBox) resultBox.innerHTML = `<div style="padding:8px;color:#f87171;font-size:12px">User not found</div>`;
-    if (hiddenId)  hiddenId.value = "";
+    if (hiddenId) hiddenId.value = "";
     return;
   }
 
@@ -2025,11 +2077,11 @@ function collectSlots() {
   const slots = [];
 
   rows.forEach(row => {
-    const time     = row.querySelector(".slot-time")?.value?.trim() || "";
-    const label    = row.querySelector(".slot-label")?.value?.trim() || "";
-    const food     = row.querySelector(".slot-food")?.value?.trim() || "";
+    const time = row.querySelector(".slot-time")?.value?.trim() || "";
+    const label = row.querySelector(".slot-label")?.value?.trim() || "";
+    const food = row.querySelector(".slot-food")?.value?.trim() || "";
     const calories = row.querySelector(".slot-calories")?.value?.trim() || "";
-    const notes    = row.querySelector(".slot-notes")?.value?.trim() || "";
+    const notes = row.querySelector(".slot-notes")?.value?.trim() || "";
 
     if (time && label && food) {
       slots.push({
@@ -2047,11 +2099,11 @@ function collectSlots() {
 
 async function submitDietPlan() {
   const userId = document.getElementById("dietUserId")?.value?.trim();
-  const day    = document.getElementById("dietDay")?.value?.trim();
-  const slots  = collectSlots();
+  const day = document.getElementById("dietDay")?.value?.trim();
+  const slots = collectSlots();
 
-  if (!userId)          return showToast("Please search and select a member", "error");
-  if (!day)             return showToast("Day is required (e.g. Monday)", "error");
+  if (!userId) return showToast("Please search and select a member", "error");
+  if (!day) return showToast("Day is required (e.g. Monday)", "error");
   if (slots.length < 1) return showToast("Add at least one meal slot", "error");
 
   const res = await API.post("/diet", {
@@ -2106,9 +2158,9 @@ async function loadDiet(userId = null) {
     }
 
     list.innerHTML = data.map(plan => {
-      const name  = escapeHtml(plan.users?.name || "Unknown");
+      const name = escapeHtml(plan.users?.name || "Unknown");
       const phone = escapeHtml(plan.users?.phone || "—");
-      const day   = escapeHtml(plan.day || "—");
+      const day = escapeHtml(plan.day || "—");
       const slots = Array.isArray(plan.slots) ? plan.slots : [];
 
       const slotsHtml = slots.length
@@ -2120,7 +2172,7 @@ async function loadDiet(userId = null) {
                 <div style="font-size:12px;color:#ccc;margin-top:2px">${escapeHtml(s.food_name || "—")}</div>
                 <div style="display:flex;gap:10px;margin-top:4px;flex-wrap:wrap">
                   ${s.calories ? `<span style="font-size:11px;color:#4ade80">🔥 ${s.calories} kcal</span>` : ""}
-                  ${s.notes    ? `<span style="font-size:11px;color:#a1a1aa">📝 ${escapeHtml(s.notes)}</span>` : ""}
+                  ${s.notes ? `<span style="font-size:11px;color:#a1a1aa">📝 ${escapeHtml(s.notes)}</span>` : ""}
                 </div>
               </div>
             </div>
@@ -2170,31 +2222,32 @@ async function deleteDietPlan(id, userId) {
     loadDiet(userId || "all");
   } else {
     showToast("Delete failed", "error");
-  }}
-  // ─────────────────────────────────────────────
+  }
+}
+// ─────────────────────────────────────────────
 //  WEEKLY DIET PLAN — 7-day builder
 // ─────────────────────────────────────────────
 
-const WEEK_DAYS = ["Monday","Tuesday","Wednesday","Thursday","Friday","Saturday","Sunday"];
+const WEEK_DAYS = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"];
 let activeDietDay = "Monday";
 let dietSlotCounters = {};   // { "Monday": 0, "Tuesday": 0, … }
 
 function initWeeklyDietBuilder() {
-  const tabsEl   = document.getElementById("dietDayTabs");
+  const tabsEl = document.getElementById("dietDayTabs");
   const panelsEl = document.getElementById("dietDayPanels");
   if (!tabsEl || !panelsEl) return;
 
-  tabsEl.innerHTML   = "";
+  tabsEl.innerHTML = "";
   panelsEl.innerHTML = "";
-  dietSlotCounters   = {};
+  dietSlotCounters = {};
 
   WEEK_DAYS.forEach((day, i) => {
     dietSlotCounters[day] = 0;
 
     // Tab button
     const btn = document.createElement("button");
-    btn.id        = `diet-tab-${day}`;
-    btn.textContent = day.slice(0,3);   // Mon, Tue, …
+    btn.id = `diet-tab-${day}`;
+    btn.textContent = day.slice(0, 3);   // Mon, Tue, …
     btn.style.cssText = `
       padding:8px 14px;
       border-radius:10px;
@@ -2229,13 +2282,13 @@ function initWeeklyDietBuilder() {
 
 function switchDietDay(day) {
   WEEK_DAYS.forEach(d => {
-    const tab   = document.getElementById(`diet-tab-${d}`);
+    const tab = document.getElementById(`diet-tab-${d}`);
     const panel = document.getElementById(`diet-panel-${d}`);
     const isActive = d === day;
     if (tab) {
-      tab.style.background   = isActive ? "rgba(232,40,26,.14)" : "#151515";
-      tab.style.color        = isActive ? "#fff" : "var(--muted)";
-      tab.style.borderColor  = isActive ? "rgba(232,40,26,.38)" : "var(--border)";
+      tab.style.background = isActive ? "rgba(232,40,26,.14)" : "#151515";
+      tab.style.color = isActive ? "#fff" : "var(--muted)";
+      tab.style.borderColor = isActive ? "rgba(232,40,26,.38)" : "var(--border)";
     }
     if (panel) panel.style.display = isActive ? "block" : "none";
   });
@@ -2298,11 +2351,11 @@ function collectDaySlots(day) {
   if (!container) return [];
   const slots = [];
   container.querySelectorAll("div[id^='diet-slot-']").forEach(row => {
-    const time     = row.querySelector(".slot-time")?.value?.trim()     || "";
-    const label    = row.querySelector(".slot-label")?.value?.trim()    || "";
-    const food     = row.querySelector(".slot-food")?.value?.trim()     || "";
+    const time = row.querySelector(".slot-time")?.value?.trim() || "";
+    const label = row.querySelector(".slot-label")?.value?.trim() || "";
+    const food = row.querySelector(".slot-food")?.value?.trim() || "";
     const calories = row.querySelector(".slot-calories")?.value?.trim() || "";
-    const notes    = row.querySelector(".slot-notes")?.value?.trim()    || "";
+    const notes = row.querySelector(".slot-notes")?.value?.trim() || "";
     if (time && label && food) {
       slots.push({
         time,
@@ -2326,11 +2379,11 @@ async function submitWeeklyDietPlan() {
   if (!daysToSubmit.length) return showToast("Add at least one meal slot to any day", "error");
 
   let successCount = 0;
-  let failCount    = 0;
+  let failCount = 0;
 
   for (const day of daysToSubmit) {
     const slots = collectDaySlots(day);
-    const res   = await API.post("/diet", {
+    const res = await API.post("/diet", {
       user_id: Number(userId),
       day,
       slots,
@@ -2343,8 +2396,8 @@ async function submitWeeklyDietPlan() {
     showToast(`✅ ${successCount} day(s) saved successfully${failCount ? `, ${failCount} failed` : ""}`, "success");
 
     // Reset
-    document.getElementById("dietUserSearch").value     = "";
-    document.getElementById("dietUserId").value         = "";
+    document.getElementById("dietUserSearch").value = "";
+    document.getElementById("dietUserId").value = "";
     document.getElementById("dietUserResult").innerHTML = "";
     initWeeklyDietBuilder();
 
@@ -2364,11 +2417,11 @@ let gymPlanDayCount = 0;
 // ── Search member ──
 async function searchUserForGymPlan(value) {
   const resultBox = document.getElementById("gymPlanUserResult");
-  const hiddenId  = document.getElementById("gymPlanUserId");
+  const hiddenId = document.getElementById("gymPlanUserId");
 
   if (!value || value.length < 3) {
     if (resultBox) resultBox.innerHTML = "";
-    if (hiddenId)  hiddenId.value = "";
+    if (hiddenId) hiddenId.value = "";
     return;
   }
 
@@ -2378,7 +2431,7 @@ async function searchUserForGymPlan(value) {
 
   if (!res?.ok || !res.data?.data) {
     if (resultBox) resultBox.innerHTML = `<div style="padding:8px;color:#f87171;font-size:12px">User not found</div>`;
-    if (hiddenId)  hiddenId.value = "";
+    if (hiddenId) hiddenId.value = "";
     return;
   }
 
@@ -2505,16 +2558,16 @@ function collectGymPlanDays() {
 
     const exercises = [];
     row.querySelectorAll(".gym-exercises-container > div").forEach(ex => {
-      const name  = ex.querySelector(".ex-name")?.value?.trim()  || "";
-      const sets  = ex.querySelector(".ex-sets")?.value?.trim()  || "";
-      const reps  = ex.querySelector(".ex-reps")?.value?.trim()  || "";
-      const rest  = ex.querySelector(".ex-rest")?.value?.trim()  || "";
+      const name = ex.querySelector(".ex-name")?.value?.trim() || "";
+      const sets = ex.querySelector(".ex-sets")?.value?.trim() || "";
+      const reps = ex.querySelector(".ex-reps")?.value?.trim() || "";
+      const rest = ex.querySelector(".ex-rest")?.value?.trim() || "";
       const notes = ex.querySelector(".ex-notes")?.value?.trim() || "";
       if (name) exercises.push({
         name,
-        sets:  sets  || null,
-        reps:  reps  || null,
-        rest:  rest  || null,
+        sets: sets || null,
+        reps: reps || null,
+        rest: rest || null,
         notes: notes || null,
       });
     });
@@ -2527,18 +2580,18 @@ function collectGymPlanDays() {
 
 // ── Submit ──
 async function submitGymPlan() {
-  const userId    = document.getElementById("gymPlanUserId")?.value?.trim();
+  const userId = document.getElementById("gymPlanUserId")?.value?.trim();
   const weekLabel = document.getElementById("gymPlanWeekLabel")?.value?.trim();
-  const days      = collectGymPlanDays();
+  const days = collectGymPlanDays();
 
-  if (!userId)                    return showToast("Please search and select a member", "error");
-  if (!Object.keys(days).length)  return showToast("Add at least one day", "error");
+  if (!userId) return showToast("Please search and select a member", "error");
+  if (!Object.keys(days).length) return showToast("Add at least one day", "error");
 
   const hasExercise = Object.values(days).some(exArr => exArr.length > 0);
   if (!hasExercise) return showToast("Add at least one exercise in a day", "error");
 
   const res = await API.post("/gym-plans", {
-    user_id:    Number(userId),
+    user_id: Number(userId),
     week_label: weekLabel || null,
     days,
   });
@@ -2547,10 +2600,10 @@ async function submitGymPlan() {
     showToast("Gym plan saved successfully ✅", "success");
 
     // Reset form
-    document.getElementById("gymPlanUserSearch").value  = "";
-    document.getElementById("gymPlanUserId").value      = "";
+    document.getElementById("gymPlanUserSearch").value = "";
+    document.getElementById("gymPlanUserId").value = "";
     document.getElementById("gymPlanUserResult").innerHTML = "";
-    document.getElementById("gymPlanWeekLabel").value   = "";
+    document.getElementById("gymPlanWeekLabel").value = "";
     document.getElementById("gymPlanDaysContainer").innerHTML = "";
     gymPlanDayCount = 0;
 
@@ -2582,31 +2635,31 @@ async function loadGymPlans() {
   }
 
   list.innerHTML = data.map(plan => {
-    const name      = escapeHtml(plan.users?.name  || "Unknown");
-    const phone     = escapeHtml(plan.users?.phone || "—");
-    const weekLabel = escapeHtml(plan.week_label   || "No label");
-    const days      = typeof plan.days === "object" ? plan.days : {};
-    const dayKeys   = Object.keys(days);
+    const name = escapeHtml(plan.users?.name || "Unknown");
+    const phone = escapeHtml(plan.users?.phone || "—");
+    const weekLabel = escapeHtml(plan.week_label || "No label");
+    const days = typeof plan.days === "object" ? plan.days : {};
+    const dayKeys = Object.keys(days);
 
     const daysHtml = dayKeys.length
       ? dayKeys.map(dayKey => {
-          const exercises = Array.isArray(days[dayKey]) ? days[dayKey] : [];
+        const exercises = Array.isArray(days[dayKey]) ? days[dayKey] : [];
 
-          const exHtml = exercises.length
-            ? `<div style="margin-top:8px;display:flex;flex-direction:column;gap:6px">
+        const exHtml = exercises.length
+          ? `<div style="margin-top:8px;display:flex;flex-direction:column;gap:6px">
                 ${exercises.map(e => `
                   <div style="display:flex;align-items:center;gap:10px;padding:7px 10px;border-radius:7px;background:#1a1a1a;flex-wrap:wrap">
                     <span style="font-size:13px;color:#fff;font-weight:600;min-width:120px">${escapeHtml(e.name || "—")}</span>
-                    ${e.sets  ? `<span style="font-size:11px;color:#93c5fd;background:rgba(37,99,235,.12);border:1px solid rgba(37,99,235,.22);padding:3px 8px;border-radius:999px">${e.sets} sets</span>` : ""}
-                    ${e.reps  ? `<span style="font-size:11px;color:#4ade80;background:rgba(22,163,74,.12);border:1px solid rgba(22,163,74,.22);padding:3px 8px;border-radius:999px">${e.reps} reps</span>` : ""}
-                    ${e.rest  ? `<span style="font-size:11px;color:#fbbf24;background:rgba(217,119,6,.12);border:1px solid rgba(217,119,6,.22);padding:3px 8px;border-radius:999px">⏱ ${e.rest}</span>` : ""}
+                    ${e.sets ? `<span style="font-size:11px;color:#93c5fd;background:rgba(37,99,235,.12);border:1px solid rgba(37,99,235,.22);padding:3px 8px;border-radius:999px">${e.sets} sets</span>` : ""}
+                    ${e.reps ? `<span style="font-size:11px;color:#4ade80;background:rgba(22,163,74,.12);border:1px solid rgba(22,163,74,.22);padding:3px 8px;border-radius:999px">${e.reps} reps</span>` : ""}
+                    ${e.rest ? `<span style="font-size:11px;color:#fbbf24;background:rgba(217,119,6,.12);border:1px solid rgba(217,119,6,.22);padding:3px 8px;border-radius:999px">⏱ ${e.rest}</span>` : ""}
                     ${e.notes ? `<span style="font-size:11px;color:#a1a1aa">📝 ${escapeHtml(e.notes)}</span>` : ""}
                   </div>
                 `).join("")}
               </div>`
-            : `<p style="font-size:12px;color:#555;margin-top:6px">No exercises</p>`;
+          : `<p style="font-size:12px;color:#555;margin-top:6px">No exercises</p>`;
 
-          return `
+        return `
             <div style="margin-bottom:12px">
               <div style="font-size:12px;font-weight:700;color:#fbbf24;margin-bottom:4px;display:flex;align-items:center;gap:6px">
                 📅 ${escapeHtml(dayKey)}
@@ -2615,7 +2668,7 @@ async function loadGymPlans() {
               ${exHtml}
             </div>
           `;
-        }).join("")
+      }).join("")
       : `<p style="font-size:12px;color:#555">No days added</p>`;
 
     return `
@@ -2692,13 +2745,13 @@ function editPlan(id) {
     </div>
     `,
     async () => {
-      const name         = document.getElementById("editPlanName")?.value?.trim() || "";
-      const price        = document.getElementById("editPlanPrice")?.value || "";
+      const name = document.getElementById("editPlanName")?.value?.trim() || "";
+      const price = document.getElementById("editPlanPrice")?.value || "";
       const duration_days = document.getElementById("editPlanDuration")?.value || "";
-      const features     = document.getElementById("editPlanFeatures")?.value
+      const features = document.getElementById("editPlanFeatures")?.value
         .split(",").map(f => f.trim()).filter(Boolean);
 
-      if (!name)  return showToast("Name is required", "error");
+      if (!name) return showToast("Name is required", "error");
       if (!price) return showToast("Price is required", "error");
 
       const res = await API.put(`/plans/${id}`, { name, price, duration_days, features });

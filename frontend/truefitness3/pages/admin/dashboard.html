@@ -977,7 +977,7 @@
       <div class="nav-item" onclick="navigate('reports',this)"><span class="ni">📊</span><span>Reports</span></div>
       <div class="nav-item" onclick="navigate('settings',this)"><span class="ni">⚙️</span><span>Settings</span></div>
       -->
-      
+
     </nav>
 
     <div class="sidebar-footer">
@@ -1066,19 +1066,20 @@
               <thead>
                 <tr>
                   <th><input type="checkbox" onchange="toggleAll(this,'dashMemberBody')" /></th>
-                  <th>Name</th>
+                  <th style="cursor:pointer" onclick="setMemberSort('name')">Name ⇅</th>
                   <th>Phone</th>
-                  <th>DOB</th>
-                  <th>Joining Date</th>
+                  <th style="cursor:pointer" onclick="setMemberSort('date_of_birth')">DOB ⇅</th>
+                  <th style="cursor:pointer" onclick="setMemberSort('start_date')">Joining Date ⇅</th>
                   <th>Plan</th>
-                  <th>Amount</th>
-                  <th>Status</th>
+                  <th style="cursor:pointer" onclick="setMemberSort('final_amount')">Amount ⇅</th>
+                  <th style="cursor:pointer" onclick="setMemberSort('end_date')">Expiry Date ⇅</th>
+                  <th style="cursor:pointer" onclick="setMemberSort('status')">Status ⇅</th>
                   <th>Actions</th>
                 </tr>
               </thead>
               <tbody id="dashMemberBody">
                 <tr>
-                  <td colspan="9" style="text-align:center;padding:20px;color:gray">Loading...</td>
+                  <td colspan="10" style="text-align:center;padding:20px;color:gray">Loading...</td>
                 </tr>
               </tbody>
             </table>
@@ -1127,19 +1128,20 @@
               <thead>
                 <tr>
                   <th><input type="checkbox" onchange="toggleAll(this,'memberBody')" /></th>
-                  <th>Name</th>
+                  <th style="cursor:pointer" onclick="setMemberSort('name')">Name ⇅</th>
                   <th>Phone</th>
-                  <th>DOB</th>
-                  <th>Joining Date</th>
+                  <th style="cursor:pointer" onclick="setMemberSort('date_of_birth')">DOB ⇅</th>
+                  <th style="cursor:pointer" onclick="setMemberSort('start_date')">Joining Date ⇅</th>
                   <th>Plan</th>
-                  <th>Amount</th>
-                  <th>Status</th>
+                  <th style="cursor:pointer" onclick="setMemberSort('final_amount')">Amount ⇅</th>
+                  <th style="cursor:pointer" onclick="setMemberSort('end_date')">Expiry Date ⇅</th>
+                  <th style="cursor:pointer" onclick="setMemberSort('status')">Status ⇅</th>
                   <th>Actions</th>
                 </tr>
               </thead>
               <tbody id="memberBody">
                 <tr>
-                  <td colspan="9" style="text-align:center;padding:20px;color:gray">Loading...</td>
+                  <td colspan="10" style="text-align:center;padding:20px;color:gray">Loading...</td>
                 </tr>
               </tbody>
             </table>
@@ -1218,7 +1220,7 @@
 "></div>
       </div>
 
-     
+
       <!-- NOTIFICATIONS -->
       <div class="page" id="page-notifications">
         <div class="page-header">
@@ -1296,123 +1298,122 @@
       </div>
 
       <!-- DIET -->
- <!-- DIET -->
-<div class="page" id="page-diet">
-  <div class="page-header">
-    <h1>Diet Plans</h1>
-    <p>Assign structured meal plans to members</p>
-  </div>
+      <!-- DIET -->
+      <div class="page" id="page-diet">
+        <div class="page-header">
+          <h1>Diet Plans</h1>
+          <p>Assign structured meal plans to members</p>
+        </div>
 
-  <!-- ADD DIET FORM -->
-  <div class="table-card">
-    <div class="tc-header">
-      <div>
-        <h3>Add Weekly Diet Plan</h3>
-        <p>Search member → select day tab → add meal slots → save</p>
+        <!-- ADD DIET FORM -->
+        <div class="table-card">
+          <div class="tc-header">
+            <div>
+              <h3>Add Weekly Diet Plan</h3>
+              <p>Search member → select day tab → add meal slots → save</p>
+            </div>
+          </div>
+
+          <!-- Member Search -->
+          <div class="form-group" style="margin-bottom:16px">
+            <label>Search Member (by Phone)</label>
+            <input id="dietUserSearch" type="tel" placeholder="e.g. 9876543210" oninput="searchUserForDiet(this.value)"
+              style="width:100%;padding:10px;border-radius:8px;border:1px solid #333;background:#1a1a1a;color:#fff;font-size:13px" />
+            <input type="hidden" id="dietUserId" />
+            <div id="dietUserResult" style="margin-top:6px"></div>
+          </div>
+
+          <!-- Day Tabs -->
+          <div id="dietDayTabs" style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:16px"></div>
+
+          <!-- Day Panels -->
+          <div id="dietDayPanels"></div>
+
+          <div style="margin-top:16px">
+            <button class="action-btn primary" onclick="submitWeeklyDietPlan()">
+              💾 Save Weekly Diet Plan
+            </button>
+          </div>
+        </div>
+
+        <!-- ASSIGNED DIET LIST -->
+        <div class="table-card" style="margin-top:20px">
+          <div class="tc-header">
+            <div>
+              <h3>Assigned Diet Plans</h3>
+              <p>All diet plans assigned by admin</p>
+            </div>
+            <button class="action-btn" onclick="loadDiet('all')" style="font-size:12px;padding:8px 12px">🔄
+              Refresh</button>
+          </div>
+          <div id="adminDietList">
+            <p style="color:gray;padding:12px">No diet plans yet</p>
+          </div>
+        </div>
       </div>
-    </div>
+      <!-- GYM PLANS -->
+      <div class="page" id="page-gym-plans">
+        <div class="page-header">
+          <h1>Gym Plans</h1>
+          <p>Assign fully custom workout plans to members</p>
+        </div>
 
-    <!-- Member Search -->
-    <div class="form-group" style="margin-bottom:16px">
-      <label>Search Member (by Phone)</label>
-      <input id="dietUserSearch" type="tel" placeholder="e.g. 9876543210"
-        oninput="searchUserForDiet(this.value)"
-        style="width:100%;padding:10px;border-radius:8px;border:1px solid #333;background:#1a1a1a;color:#fff;font-size:13px" />
-      <input type="hidden" id="dietUserId" />
-      <div id="dietUserResult" style="margin-top:6px"></div>
-    </div>
+        <!-- ADD GYM PLAN FORM -->
+        <div class="table-card">
+          <div class="tc-header">
+            <div>
+              <h3>Create Gym Plan</h3>
+              <p>Search member → set week → add days → add exercises</p>
+            </div>
+          </div>
 
-    <!-- Day Tabs -->
-    <div id="dietDayTabs" style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:16px"></div>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:16px">
 
-    <!-- Day Panels -->
-    <div id="dietDayPanels"></div>
+            <!-- Member Search -->
+            <div class="form-group" style="grid-column:1/-1">
+              <label>Search Member (by Phone)</label>
+              <input id="gymPlanUserSearch" placeholder="e.g. 9876543210" oninput="searchUserForGymPlan(this.value)" />
+              <input type="hidden" id="gymPlanUserId" />
+              <div id="gymPlanUserResult"></div>
+            </div>
 
-    <div style="margin-top:16px">
-      <button class="action-btn primary" onclick="submitWeeklyDietPlan()">
-        💾 Save Weekly Diet Plan
-      </button>
-    </div>
-  </div>
+            <!-- Week Label -->
+            <div class="form-group">
+              <label>Week Label (optional)</label>
+              <input id="gymPlanWeekLabel" type="text" placeholder="e.g. Week 1 / Beginner Phase" />
+            </div>
 
-  <!-- ASSIGNED DIET LIST -->
-  <div class="table-card" style="margin-top:20px">
-    <div class="tc-header">
-      <div>
-        <h3>Assigned Diet Plans</h3>
-        <p>All diet plans assigned by admin</p>
+          </div>
+
+          <!-- Days Builder -->
+          <div style="margin-bottom:12px">
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">
+              <label style="font-size:13px;font-weight:600;color:#ccc">📅 Days & Exercises</label>
+              <button class="tc-btn" onclick="addGymPlanDay()">+ Add Day</button>
+            </div>
+            <div id="gymPlanDaysContainer"></div>
+          </div>
+
+          <div style="margin-top:16px">
+            <button class="action-btn primary" onclick="submitGymPlan()">💾 Save Gym Plan</button>
+          </div>
+        </div>
+
+        <!-- ASSIGNED GYM PLANS LIST -->
+        <div class="table-card" style="margin-top:20px">
+          <div class="tc-header">
+            <div>
+              <h3>Assigned Gym Plans</h3>
+              <p>All gym plans assigned by admin</p>
+            </div>
+            <button class="action-btn" onclick="loadGymPlans()" style="font-size:12px;padding:8px 12px">🔄
+              Refresh</button>
+          </div>
+          <div id="adminGymPlanList">
+            <p style="color:gray;padding:12px">No gym plans yet</p>
+          </div>
+        </div>
       </div>
-      <button class="action-btn" onclick="loadDiet('all')"
-        style="font-size:12px;padding:8px 12px">🔄 Refresh</button>
-    </div>
-    <div id="adminDietList">
-      <p style="color:gray;padding:12px">No diet plans yet</p>
-    </div>
-  </div>
-</div>
-<!-- GYM PLANS -->
-<div class="page" id="page-gym-plans">
-  <div class="page-header">
-    <h1>Gym Plans</h1>
-    <p>Assign fully custom workout plans to members</p>
-  </div>
-
-  <!-- ADD GYM PLAN FORM -->
-  <div class="table-card">
-    <div class="tc-header">
-      <div>
-        <h3>Create Gym Plan</h3>
-        <p>Search member → set week → add days → add exercises</p>
-      </div>
-    </div>
-
-    <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:16px">
-
-      <!-- Member Search -->
-      <div class="form-group" style="grid-column:1/-1">
-        <label>Search Member (by Phone)</label>
-        <input id="gymPlanUserSearch" placeholder="e.g. 9876543210"
-          oninput="searchUserForGymPlan(this.value)" />
-        <input type="hidden" id="gymPlanUserId" />
-        <div id="gymPlanUserResult"></div>
-      </div>
-
-      <!-- Week Label -->
-      <div class="form-group">
-        <label>Week Label (optional)</label>
-        <input id="gymPlanWeekLabel" type="text" placeholder="e.g. Week 1 / Beginner Phase" />
-      </div>
-
-    </div>
-
-    <!-- Days Builder -->
-    <div style="margin-bottom:12px">
-      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">
-        <label style="font-size:13px;font-weight:600;color:#ccc">📅 Days & Exercises</label>
-        <button class="tc-btn" onclick="addGymPlanDay()">+ Add Day</button>
-      </div>
-      <div id="gymPlanDaysContainer"></div>
-    </div>
-
-    <div style="margin-top:16px">
-      <button class="action-btn primary" onclick="submitGymPlan()">💾 Save Gym Plan</button>
-    </div>
-  </div>
-
-  <!-- ASSIGNED GYM PLANS LIST -->
-  <div class="table-card" style="margin-top:20px">
-    <div class="tc-header">
-      <div>
-        <h3>Assigned Gym Plans</h3>
-        <p>All gym plans assigned by admin</p>
-      </div>
-      <button class="action-btn" onclick="loadGymPlans()" style="font-size:12px;padding:8px 12px">🔄 Refresh</button>
-    </div>
-    <div id="adminGymPlanList">
-      <p style="color:gray;padding:12px">No gym plans yet</p>
-    </div>
-  </div>
-</div>
 
       <!-- RECEIPTS -->
       <div class="page" id="page-receipts">
@@ -1536,7 +1537,8 @@
       <div class="modal-desc" id="modalDesc">Modal description</div>
       <div id="modalBody"></div>
       <div class="modal-btns">
-        <button type="button" class="modal-cancel" onclick="window._currentSkipHandler ? window._currentSkipHandler() : closeModal()">Cancel</button>
+        <button type="button" class="modal-cancel"
+          onclick="window._currentSkipHandler ? window._currentSkipHandler() : closeModal()">Cancel</button>
         <button type="button" class="modal-confirm" id="modalConfirmBtn">Continue</button>
       </div>
     </div>
