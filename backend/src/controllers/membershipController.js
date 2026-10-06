@@ -354,8 +354,6 @@ exports.getAllMemberships = async (req, res) => {
   try {
     const { status, limit, user_id, latest_only } = req.query;
 
-    await expireStaleMemberships();
-
     let query = supabase
       .from("user_memberships")
       .select("*")
@@ -807,7 +805,6 @@ exports.modifyMembership = async (req, res) => {
 // Admin: stats
 exports.getMembershipStats = async (req, res) => {
   try {
-    await expireStaleMemberships();
 
     const { data, error } = await supabase
       .from("user_memberships")
