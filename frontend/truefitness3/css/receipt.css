@@ -542,3 +542,37 @@
         grid-template-columns: 1fr;
     }
 }
+
+.r-range-bar {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 14px;
+    flex-wrap: wrap;
+}
+
+.r-range-label {
+    font-size: 13px;
+    opacity: .75;
+}
+
+.r-range-select {
+    padding: 8px 12px;
+    border-radius: 8px;
+    border: 1px solid var(--border, rgba(255, 255, 255, 0.15));
+    background: var(--card2, #181818);
+    color: #fff;
+    font-size: 14px;
+    cursor: pointer;
+    outline: none;
+}
+
+.r-range-select option {
+    background: #181818;
+    color: #fff;
+}
+
+.r-range-hint {
+    font-size: 12px;
+    opacity: .6;
+}

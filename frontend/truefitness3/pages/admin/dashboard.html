@@ -1437,7 +1437,16 @@
           <h1>Receipts</h1>
           <p>Payment receipts for all successful transactions</p>
         </div>
-
+        <div class="r-range-bar">
+          <label for="rRangeSelect" class="r-range-label">Revenue period</label>
+          <select id="rRangeSelect" class="r-range-select" onchange="receiptsOnRangeChange(this.value)">
+            <option value="this_month">This Month</option>
+            <option value="1">Last 1 Month</option>
+            <option value="2">Last 2 Months</option>
+            <option value="3">Last 3 Months</option>
+          </select>
+          <span class="r-range-hint" id="rRangeHint"></span>
+        </div>
         <div class="r-stats-grid">
           <div class="r-stat-card">
             <div class="r-stat-icon">🧾</div>
@@ -1457,14 +1466,14 @@
             <div class="r-stat-icon">📅</div>
             <div class="r-stat-info">
               <div class="r-stat-val" id="rMonthCount">—</div>
-              <div class="r-stat-label">This Month</div>
+              <div class="r-stat-label" id="rMonthCountLabel">This Month</div>
             </div>
           </div>
           <div class="r-stat-card">
             <div class="r-stat-icon">📈</div>
             <div class="r-stat-info">
               <div class="r-stat-val" id="rMonthRev">—</div>
-              <div class="r-stat-label">Month Revenue</div>
+              <div class="r-stat-label" id="rMonthRevLabel">Month Revenue</div>
             </div>
           </div>
         </div>
@@ -1563,7 +1572,7 @@
   <!-- API + DASHBOARD JS -->
   <script src="../../js/api.js?v=20260803b"></script>
   <script src="../../js/admin-dashboard.js?v=20260803b"></script>
-  <script src="../../js/receipt.js?v=20260803b"></script>
+  <script src="../../js/receipt.js?v=20261006a"></script>
 
   <!-- logout -->
   <!-- REPLACE your existing inline logout script with this -->

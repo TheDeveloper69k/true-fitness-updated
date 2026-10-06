@@ -8,6 +8,7 @@ let receiptsTotal = 0;
 let receiptsSearch = '';
 let receiptsFrom = '';
 let receiptsTo = '';
+let revenueRange = 'this_month';
 
 // ─── Load Receipts ────────────────────────────────────────────
 async function loadReceipts(page = 1) {
@@ -22,7 +23,7 @@ async function loadReceipts(page = 1) {
     });
 
     const [statsRes, listRes] = await Promise.all([
-        API.get('/receipts/stats'),
+        API.get(`/receipts/stats?range=${revenueRange}`),
         API.get(`/receipts?${params}`),
     ]);
 
@@ -46,6 +47,17 @@ function renderReceiptStats(s) {
     _rSet('rTotalRev', '₹' + _fmt(s.total_revenue || 0));
     _rSet('rMonthCount', s.month_receipts || 0);
     _rSet('rMonthRev', '₹' + _fmt(s.month_revenue || 0));
+
+    const isThisMonth = (s.range || 'this_month') === 'this_month';
+    _rSet('rMonthCountLabel', isThisMonth ? 'This Month' : 'Receipts (' + (s.range_label || '') + ')');
+    _rSet('rMonthRevLabel', isThisMonth ? 'Month Revenue' : 'Revenue (' + (s.range_label || '') + ')');
+    _rSet('rRangeHint', s.range_label || '');
+}
+
+async function receiptsOnRangeChange(val) {
+    revenueRange = val;
+    const res = await API.get(`/receipts/stats?range=${revenueRange}`);
+    if (res?.ok) renderReceiptStats(res.data.data);
 }
 
 // ─── Render Table ─────────────────────────────────────────────
@@ -183,14 +195,14 @@ function buildReceiptHTML(r) {
 
     // Compute expiry
     let expiry = '—';
-if (r.membership_end_date) {
-    expiry = new Date(r.membership_end_date).toLocaleDateString('en-IN', { day: 'numeric', month: 'long', year: 'numeric' });
-} else if (r.payment_date && r.plan?.duration_days) {
-    // fallback for old receipts that don't have membership_end_date
-    const exp = new Date(r.payment_date);
-    exp.setDate(exp.getDate() + r.plan.duration_days);
-    expiry = exp.toLocaleDateString('en-IN', { day: 'numeric', month: 'long', year: 'numeric' });
-}
+    if (r.membership_end_date) {
+        expiry = new Date(r.membership_end_date).toLocaleDateString('en-IN', { day: 'numeric', month: 'long', year: 'numeric' });
+    } else if (r.payment_date && r.plan?.duration_days) {
+        // fallback for old receipts that don't have membership_end_date
+        const exp = new Date(r.payment_date);
+        exp.setDate(exp.getDate() + r.plan.duration_days);
+        expiry = exp.toLocaleDateString('en-IN', { day: 'numeric', month: 'long', year: 'numeric' });
+    }
 
     return `
   <div class="receipt-doc" id="receiptDoc">

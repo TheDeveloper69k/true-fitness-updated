@@ -144,14 +144,57 @@ const getReceiptById = async (req, res) => {
 };
 
 // ─── Get Receipts Summary Stats ───────────────────────────────
-// GET /api/v1/receipts/stats
-const getReceiptStats = async (req, res) => {
-    try {
+// ─── Revenue range helpers (IST) ──────────────────────────────
+const IST_OFFSET_MS = 5.5 * 60 * 60 * 1000;
+const MONTH_NAMES = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+
+const istMonthStart = (monthOffset = 0) => {
+    const istNow = new Date(Date.now() + IST_OFFSET_MS);
+    const ms = Date.UTC(istNow.getUTCFullYear(), istNow.getUTCMonth() + monthOffset, 1);
+    return new Date(ms - IST_OFFSET_MS);
+};
+
+const labelForMonth = (d) => {
+    const ist = new Date(d.getTime() + IST_OFFSET_MS);
+    return `${MONTH_NAMES[ist.getUTCMonth()]} ${ist.getUTCFullYear()}`;
+};
+
+const resolveRange = (range) => {
+    const n = parseInt(range, 10);
+    if (n >= 1 && n <= 3) {
+        const from = istMonthStart(-n);
+        const to = istMonthStart(0);
+        const lastMonth = new Date(to.getTime() - 1);
+        const label = n === 1
+            ? labelForMonth(from)
+            : `${labelForMonth(from)} – ${labelForMonth(lastMonth)}`;
+        return { key: String(n), from, to, label };
+    }
+    const from = istMonthStart(0);
+    return { key: "this_month", from, to: new Date(Date.now() + 1000), label: `This month (${labelForMonth(from)})` };
+};
+
+const fetchAllSuccessfulPayments = async () => {
+    const pageSize = 1000;
+    let all = [];
+    for (let offset = 0; ; offset += pageSize) {
         const { data, error } = await supabase
             .from("payments")
             .select("amount, payment_date")
-            .eq("status", "success");
+            .eq("status", "success")
+            .order("id", { ascending: true })
+            .range(offset, offset + pageSize - 1);
+        if (error) return { error };
+        all = all.concat(data);
+        if (data.length < pageSize) break;
+    }
+    return { data: all };
+};
 
+// GET /api/v1/receipts/stats?range=this_month|1|2|3
+const getReceiptStats = async (req, res) => {
+    try {
+        const { data, error } = await fetchAllSuccessfulPayments();
         if (error) {
             return res.status(500).json({ success: false, message: "Failed to fetch stats" });
         }
@@ -159,21 +202,22 @@ const getReceiptStats = async (req, res) => {
         const total = data.length;
         const revenue = data.reduce((sum, p) => sum + parseFloat(p.amount || 0), 0);
 
-        // This month
-        const now = new Date();
-        const thisMonth = data.filter(p => {
-            const d = new Date(p.payment_date);
-            return d.getMonth() === now.getMonth() && d.getFullYear() === now.getFullYear();
+        const range = resolveRange(req.query.range);
+        const inRange = data.filter(p => {
+            const t = new Date(p.payment_date).getTime();
+            return t >= range.from.getTime() && t < range.to.getTime();
         });
-        const monthRevenue = thisMonth.reduce((sum, p) => sum + parseFloat(p.amount || 0), 0);
+        const rangeRevenue = inRange.reduce((sum, p) => sum + parseFloat(p.amount || 0), 0);
 
         return res.status(200).json({
             success: true,
             data: {
                 total_receipts: total,
                 total_revenue: revenue,
-                month_receipts: thisMonth.length,
-                month_revenue: monthRevenue,
+                month_receipts: inRange.length,
+                month_revenue: rangeRevenue,
+                range: range.key,
+                range_label: range.label,
             },
         });
     } catch (err) {
