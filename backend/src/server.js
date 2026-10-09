@@ -29,11 +29,19 @@ const checkDatabaseConnection = async () => {
 
 // ─── Register Cron Jobs ───────────────────────────────────────────────────────
 const registerCronJobs = () => {
+
   try {
     require("./cron/membershipExpiryJob");
     console.log("[Cron] Membership expiry alerts job registered");
   } catch (err) {
-    console.error("[Cron] Failed to register cron jobs:", err.message);
+    console.error("[Cron] Failed to register expiry job:", err.message);
+  }
+
+  try {
+    require("./cron/membershipCleanupJob");
+    console.log("[Cron] Membership cleanup job registered");
+  } catch (err) {
+    console.error("[Cron] Failed to register cleanup job:", err.message);
   }
 
   // try {
@@ -53,7 +61,12 @@ const registerCronJobs = () => {
 
 // ─── Start Server ─────────────────────────────────────────────────────────────
 const startServer = async () => {
-  await checkDatabaseConnection();
+
+  if (process.env.SKIP_DB_CHECK === "true") {
+    console.log("[DB] Skipping database check for local cron-registration test");
+  } else {
+    await checkDatabaseConnection();
+  }
 
   // Register cron jobs after DB is confirmed healthy
   registerCronJobs();

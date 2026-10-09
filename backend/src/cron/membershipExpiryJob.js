@@ -1,4 +1,3 @@
-js
 // cron/membershipExpiryJob.js
 //
 // Runs daily at 5:00 AM IST
