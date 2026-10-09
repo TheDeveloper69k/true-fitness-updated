@@ -1,6 +1,7 @@
+js
 // cron/membershipExpiryJob.js
 //
-// Runs daily at 9:00 AM IST
+// Runs daily at 5:00 AM IST
 // Sends WhatsApp alerts to members whose membership expires in 3 days or 1 day
 //
 // Requires: npm install node-cron
@@ -8,9 +9,9 @@
 const cron = require("node-cron");
 const { sendMembershipExpiryAlerts } = require("../controllers/whatsappController");
 
-// ─── Every day at 9:00 AM IST ─────────────────────────────────────────────────
+// ─── Every day at 5:00 AM IST ─────────────────────────────────────────────────
 cron.schedule(
-  "0 9 * * *",
+  "0 5 * * *",
   async () => {
     console.log(`\n[CronJob] ── Membership Expiry Alerts ── ${new Date().toISOString()}`);
 
@@ -25,4 +26,4 @@ cron.schedule(
   { timezone: "Asia/Kolkata" }
 );
 
-console.log("[CronJob] Membership expiry job registered — runs daily at 9:00 AM IST");
+console.log("[CronJob] Membership expiry job registered — runs daily at 5:00 AM IST");

@@ -9,18 +9,48 @@ function normalizeDate(date) {
   return d.toISOString().split("T")[0];
 }
 
-//make changes
+// Add calendar months, clamping to the last day of the target month.
+function addMonths(startDate, months) {
+  if (!startDate || !Number.isInteger(Number(months))) return null;
 
+  const [year, month, day] = String(startDate).split("-").map(Number);
+
+  if (![year, month, day].every(Number.isInteger)) return null;
+  if (month < 1 || month > 12 || day < 1 || day > 31) return null;
+
+  const targetMonth = month - 1 + Number(months);
+  const targetYear = year + Math.floor(targetMonth / 12);
+  const normalizedMonth = ((targetMonth % 12) + 12) % 12;
+
+  const lastDay = new Date(
+    Date.UTC(targetYear, normalizedMonth + 1, 0)
+  ).getUTCDate();
+
+  const result = new Date(
+    Date.UTC(targetYear, normalizedMonth, Math.min(day, lastDay))
+  );
+
+  return result.toISOString().split("T")[0];
+}
+
+// Add days, used to preserve remaining membership time during renewal.
 function addDays(startDate, days) {
-  const d = new Date(startDate);
-  if (Number.isNaN(d.getTime())) return null;
-  d.setDate(d.getDate() + Number(days));
-  return d.toISOString().split("T")[0];
+  if (!startDate || !Number.isInteger(Number(days))) return null;
+
+  const [year, month, day] = String(startDate).split("-").map(Number);
+
+  if (![year, month, day].every(Number.isInteger)) return null;
+
+  const result = new Date(Date.UTC(year, month - 1, day + Number(days)));
+
+  if (Number.isNaN(result.getTime())) return null;
+
+  return result.toISOString().split("T")[0];
 }
 
 async function expireStaleMemberships() {
   const now = new Date();
-  const istOffsetMs = 5.5 * 60 * 60 * 1000; // IST = UTC+5:30
+  const istOffsetMs = 5.5 * 60 * 60 * 1000;
   const istNow = new Date(now.getTime() + istOffsetMs);
   const todayStr = istNow.toISOString().split("T")[0];
 
@@ -43,7 +73,7 @@ exports.expireStaleMemberships = expireStaleMemberships;
 async function getPlanByName(planName) {
   const { data, error } = await supabase
     .from("membership_plans")
-    .select("id, name, duration_days, price, is_active")
+    .select("id, name, duration_days, duration_months, price, is_active")
     .eq("name", planName)
     .eq("is_active", true)
     .maybeSingle();
@@ -162,6 +192,7 @@ exports.assignMembership = async (req, res) => {
     }
 
     const normalizedStartDate = normalizeDate(start_date);
+
     if (!normalizedStartDate) {
       return res.status(400).json({
         success: false,
@@ -170,6 +201,7 @@ exports.assignMembership = async (req, res) => {
     }
 
     const parsedDiscount = Number(discount || 0);
+
     if (Number.isNaN(parsedDiscount) || parsedDiscount < 0) {
       return res.status(400).json({
         success: false,
@@ -178,6 +210,7 @@ exports.assignMembership = async (req, res) => {
     }
 
     const plan = await getPlanByName(String(monthly_plan).trim());
+
     if (!plan) {
       return res.status(400).json({
         success: false,
@@ -202,7 +235,18 @@ exports.assignMembership = async (req, res) => {
       });
     }
 
-    const resolvedEndDate = addDays(normalizedStartDate, durationDays);
+    const durationMonths = Number(plan.duration_months);
+
+    if (!Number.isInteger(durationMonths) || durationMonths <= 0) {
+      return res.status(400).json({
+        success: false,
+        message: "Selected plan has invalid month duration",
+      });
+    }
+
+    // Calendar-month expiry, including free months.
+    const resolvedEndDate = addMonths(normalizedStartDate, durationMonths);
+
     if (!resolvedEndDate) {
       return res.status(400).json({
         success: false,
@@ -280,12 +324,14 @@ exports.assignMembership = async (req, res) => {
       });
     }
 
-    const finalAmount = Number(membership.final_amount ?? planPrice - parsedDiscount);
+    const finalAmount = Number(
+      membership.final_amount ?? planPrice - parsedDiscount
+    );
 
     const paymentPayload = {
       user_id: resolvedUserId,
       amount: finalAmount,
-      status: "success",              // ✅ matches your DB  constraint
+      status: "success",
       payment_date: new Date(normalizedStartDate).toISOString(),
       plan_id: plan.id,
       gym_id: gym_id || null,
@@ -329,7 +375,12 @@ exports.assignMembership = async (req, res) => {
       endDate: resolvedEndDate,
       paymentMethod: payment_method,
       isRenewal: false,
-    }).catch((err) => console.error("[assignMembership] WhatsApp confirmation error:", err.message));
+    }).catch((err) =>
+      console.error(
+        "[assignMembership] WhatsApp confirmation error:",
+        err.message
+      )
+    );
 
     return res.status(201).json({
       success: true,
@@ -341,6 +392,7 @@ exports.assignMembership = async (req, res) => {
     });
   } catch (err) {
     console.error("[assignMembership]", err);
+
     return res.status(500).json({
       success: false,
       message: "Server error while adding membership",
@@ -387,7 +439,9 @@ exports.getAllMemberships = async (req, res) => {
       const map = new Map();
 
       for (const item of result) {
-        const key = item.user_id || `${item.full_name || ""}_${item.phone || ""}`;
+        const key =
+          item.user_id || `${item.full_name || ""}_${item.phone || ""}`;
+
         if (!map.has(key)) {
           map.set(key, item);
         }
@@ -451,6 +505,7 @@ exports.getUserMembership = async (req, res) => {
     });
   }
 };
+
 // Admin: update membership status
 exports.updateMembershipStatus = async (req, res) => {
   try {
@@ -503,7 +558,10 @@ exports.renewMembership = async (req, res) => {
     const { start_date, monthly_plan, discount } = req.body;
 
     if (!monthly_plan || !String(monthly_plan).trim()) {
-      return res.status(400).json({ success: false, message: "Plan name is required" });
+      return res.status(400).json({
+        success: false,
+        message: "Plan name is required",
+      });
     }
 
     const { data: existingMembership, error: fetchError } = await supabase
@@ -513,52 +571,107 @@ exports.renewMembership = async (req, res) => {
       .single();
 
     if (fetchError || !existingMembership) {
-      return res.status(404).json({ success: false, message: "Membership not found" });
+      return res.status(404).json({
+        success: false,
+        message: "Membership not found",
+      });
     }
 
     const today = new Date().toISOString().split("T")[0];
     const newStartDate = normalizeDate(start_date || today);
+
     if (!newStartDate) {
-      return res.status(400).json({ success: false, message: "Invalid start date" });
+      return res.status(400).json({
+        success: false,
+        message: "Invalid start date",
+      });
     }
 
     const parsedDiscount =
-      discount !== undefined ? Number(discount) : Number(existingMembership.discount || 0);
+      discount !== undefined
+        ? Number(discount)
+        : Number(existingMembership.discount || 0);
 
     if (Number.isNaN(parsedDiscount) || parsedDiscount < 0) {
-      return res.status(400).json({ success: false, message: "Discount must be a valid positive number" });
+      return res.status(400).json({
+        success: false,
+        message: "Discount must be a valid positive number",
+      });
     }
 
     const plan = await getPlanByName(String(monthly_plan).trim());
+
     if (!plan) {
-      return res.status(400).json({ success: false, message: "Selected membership plan not found or inactive" });
+      return res.status(400).json({
+        success: false,
+        message: "Selected membership plan not found or inactive",
+      });
     }
 
     const newPlanPrice = Number(plan.price || 0);
     const durationDays = Number(plan.duration_days || 0);
 
     if (parsedDiscount > newPlanPrice) {
-      return res.status(400).json({ success: false, message: "Discount cannot be greater than plan price" });
+      return res.status(400).json({
+        success: false,
+        message: "Discount cannot be greater than plan price",
+      });
     }
 
     if (durationDays <= 0) {
-      return res.status(400).json({ success: false, message: "Selected plan has invalid duration" });
+      return res.status(400).json({
+        success: false,
+        message: "Selected plan has invalid duration",
+      });
     }
 
-    // Calculate remaining days rollover
+    // Calculate remaining days rollover.
     let totalDays = durationDays;
-    const existingEndDate = existingMembership.end_date ? new Date(existingMembership.end_date) : null;
+
+    const existingEndDate = existingMembership.end_date
+      ? new Date(existingMembership.end_date)
+      : null;
+
     const todayDate = new Date(today);
 
     if (existingEndDate && existingEndDate > todayDate) {
       const remainingMs = existingEndDate - todayDate;
-      const remainingDays = Math.ceil(remainingMs / (1000 * 60 * 60 * 24));
+      const remainingDays = Math.ceil(
+        remainingMs / (1000 * 60 * 60 * 24)
+      );
+
       totalDays = durationDays + remainingDays;
     }
 
-    const newEndDate = addDays(newStartDate, totalDays);
+    const durationMonths = Number(plan.duration_months);
+
+    if (!Number.isInteger(durationMonths) || durationMonths <= 0) {
+      return res.status(400).json({
+        success: false,
+        message: "Selected plan has invalid month duration",
+      });
+    }
+
+    const baseEndDate = addMonths(newStartDate, durationMonths);
+
+    if (!baseEndDate) {
+      return res.status(400).json({
+        success: false,
+        message: "Invalid end date",
+      });
+    }
+
+    // Preserve unused days from the previous membership.
+    const newEndDate =
+      totalDays > durationDays
+        ? addDays(baseEndDate, totalDays - durationDays)
+        : baseEndDate;
+
     if (!newEndDate) {
-      return res.status(400).json({ success: false, message: "Invalid end date" });
+      return res.status(400).json({
+        success: false,
+        message: "Invalid end date",
+      });
     }
 
     const updatePayload = {
@@ -579,10 +692,13 @@ exports.renewMembership = async (req, res) => {
       .single();
 
     if (error) {
-      return res.status(500).json({ success: false, message: "Failed to renew membership", error: error.message });
+      return res.status(500).json({
+        success: false,
+        message: "Failed to renew membership",
+        error: error.message,
+      });
     }
 
-    // ✅ Payment insert is INSIDE try block, BEFORE the final return
     const finalAmount = newPlanPrice - parsedDiscount;
 
     const paymentPayload = {
@@ -597,7 +713,7 @@ exports.renewMembership = async (req, res) => {
       transaction_id: req.body.transaction_id || `TF-${Date.now()}`,
       paid_at: new Date(newStartDate).toISOString(),
       updated_at: new Date().toISOString(),
-      membership_end_date: newEndDate, // ✅ actual end date with rollover
+      membership_end_date: newEndDate,
     };
 
     const { error: paymentError } = await supabase
@@ -605,7 +721,10 @@ exports.renewMembership = async (req, res) => {
       .insert([paymentPayload]);
 
     if (paymentError) {
-      console.error("Receipt creation failed after renewal:", paymentError.message);
+      console.error(
+        "Receipt creation failed after renewal:",
+        paymentError.message
+      );
     }
 
     sendMembershipConfirmation({
@@ -618,17 +737,21 @@ exports.renewMembership = async (req, res) => {
       endDate: newEndDate,
       paymentMethod: req.body.payment_method,
       isRenewal: true,
-    }).catch((err) => console.error("[renewMembership] WhatsApp confirmation error:", err.message));
+    }).catch((err) =>
+      console.error(
+        "[renewMembership] WhatsApp confirmation error:",
+        err.message
+      )
+    );
 
-    // ✅ Single final return
     return res.status(200).json({
       success: true,
       message: "Membership renewed successfully",
       data,
     });
-
   } catch (err) {
     console.error("[renewMembership]", err);
+
     return res.status(500).json({
       success: false,
       message: "Server error while renewing membership",
@@ -636,6 +759,8 @@ exports.renewMembership = async (req, res) => {
     });
   }
 };
+
+// Admin: modify membership
 exports.modifyMembership = async (req, res) => {
   try {
     const { id } = req.params;
@@ -679,6 +804,7 @@ exports.modifyMembership = async (req, res) => {
           message: "Invalid status value",
         });
       }
+
       updatePayload.status = status;
     }
 
@@ -754,21 +880,38 @@ exports.modifyMembership = async (req, res) => {
 
     if (end_date !== undefined) {
       const normalizedEndDate = normalizeDate(end_date);
+
       if (!normalizedEndDate) {
         return res.status(400).json({
           success: false,
           message: "Invalid end date",
         });
       }
+
       updatePayload.end_date = normalizedEndDate;
-    } else if (resolvedDurationDays && normalizedStartDate) {
-      const calculatedEndDate = addDays(normalizedStartDate, resolvedDurationDays);
+    } else if (normalizedStartDate && (monthly_plan || start_date !== undefined)) {
+      const plan = await getPlanByName(resolvedPlanName);
+      const durationMonths = Number(plan?.duration_months);
+
+      if (!Number.isInteger(durationMonths) || durationMonths <= 0) {
+        return res.status(400).json({
+          success: false,
+          message: "Selected plan has invalid month duration",
+        });
+      }
+
+      const calculatedEndDate = addMonths(
+        normalizedStartDate,
+        durationMonths
+      );
+
       if (!calculatedEndDate) {
         return res.status(400).json({
           success: false,
           message: "Invalid calculated end date",
         });
       }
+
       updatePayload.end_date = calculatedEndDate;
     }
 
@@ -794,6 +937,7 @@ exports.modifyMembership = async (req, res) => {
     });
   } catch (err) {
     console.error("[modifyMembership]", err);
+
     return res.status(500).json({
       success: false,
       message: "Server error while modifying membership",
@@ -805,7 +949,6 @@ exports.modifyMembership = async (req, res) => {
 // Admin: stats
 exports.getMembershipStats = async (req, res) => {
   try {
-
     const { data, error } = await supabase
       .from("user_memberships")
       .select("*");
@@ -834,6 +977,7 @@ exports.getMembershipStats = async (req, res) => {
 
     for (const member of rows) {
       const amount = Number(member.final_amount || 0);
+
       if (!Number.isNaN(amount)) {
         stats.totalRevenue += amount;
       }
@@ -855,9 +999,9 @@ exports.getMembershipStats = async (req, res) => {
       message: "Server error while fetching membership stats",
       error: err.message,
     });
-
   }
 };
+
 // Admin: delete member (user + their memberships)
 exports.deleteMember = async (req, res) => {
   try {
@@ -870,19 +1014,19 @@ exports.deleteMember = async (req, res) => {
       });
     }
 
-    // 1. Delete all memberships for this user (ignore if none exist)
+    // 1. Delete all memberships for this user (ignore if none exist).
     await supabase
       .from("user_memberships")
       .delete()
       .eq("user_id", userId);
 
-    // 2. Delete payments for this user (ignore if none exist)
+    // 2. Delete payments for this user (ignore if none exist).
     await supabase
       .from("payments")
       .delete()
       .eq("user_id", userId);
 
-    // 3. Delete the user itself
+    // 3. Delete the user itself.
     const { error: userError } = await supabase
       .from("users")
       .delete()
