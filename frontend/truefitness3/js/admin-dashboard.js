@@ -433,7 +433,13 @@ function renderMemberTable(tbodyId, rows, filter = "all") {
           <div style="display:flex;gap:6px;flex-wrap:wrap">
             <button class="tc-btn" onclick="openStatusModal(${m.id}, '${m.status || "active"}')">✏️ Status</button>
             <button class="tc-btn" onclick="openRenewMembershipModal(${m.id}, '${safeNameForJs}', '${escapeJsString(m.monthly_plan || "")}')">🔄 Renew</button>
-            <button class="tc-btn" style="color:#f87171;border-color:rgba(232,40,26,.35)"
+
+<button class="tc-btn"
+  onclick='openEditMemberModal(${JSON.stringify(m).replace(/'/g, "&#39;")})'>
+  ✏️ Edit
+</button>
+
+<button class="tc-btn" style="color:#f87171;border-color:rgba(232,40,26,.35)"
               onclick="openDeleteMemberModal('${deleteUserId}', '${safeNameForJs}')">🗑 Delete</button>
           </div>
         </td>
@@ -829,6 +835,103 @@ async function assignMembership(userId, assigned = false) {
     showToast(res?.data?.message || "Failed to assign membership", "error");
   }
 }
+
+
+// ─────────────────────────────────────────────
+//  Edit Member
+// ─────────────────────────────────────────────
+
+async function openEditMemberModal(m) {
+  await ensurePlansLoaded();
+
+  openModal(
+    "✏️ Edit Member",
+    `Update membership details for ${m.name || m.full_name || "Member"}`,
+    `
+    <div class="form-group">
+      <label>Membership Plan</label>
+      <select id="editPlan"></select>
+    </div>
+
+    <div class="form-group">
+      <label>Discount (₹)</label>
+      <input id="editDiscount" type="number" min="0"
+        value="${Number(m.discount || 0)}"/>
+    </div>
+
+    <div class="form-group">
+      <label>Status</label>
+      <select id="editStatus">
+        <option value="active">Active</option>
+        <option value="inactive">Inactive</option>
+        <option value="expired">Expired</option>
+        <option value="cancelled">Cancelled</option>
+        <option value="suspended">Suspended</option>
+      </select>
+    </div>
+
+    <div class="form-group">
+      <label>Date of Birth</label>
+      <input id="editDob" type="date"
+        value="${m.date_of_birth || ""}"/>
+    </div>
+
+    <div class="form-group">
+      <label>Joining Date</label>
+      <input id="editStartDate" type="date"
+        value="${m.start_date || ""}"/>
+    </div>
+
+    <div class="form-group">
+      <label>Expiry Date</label>
+      <input id="editEndDate" type="date"
+        value="${m.end_date || ""}"/>
+    </div>
+    `,
+    () => saveMemberEdit(m.id),
+    "Save Changes"
+  );
+
+  fillPlanDropdown("editPlan", m.monthly_plan || "");
+
+  const statusSelect = document.getElementById("editStatus");
+  if (statusSelect) statusSelect.value = m.status || "active";
+}
+
+async function saveMemberEdit(membershipId) {
+  const payload = {
+    monthly_plan: document.getElementById("editPlan")?.value,
+    discount: Number(document.getElementById("editDiscount")?.value),
+    status: document.getElementById("editStatus")?.value,
+    date_of_birth: document.getElementById("editDob")?.value || null,
+    start_date: document.getElementById("editStartDate")?.value,
+    end_date: document.getElementById("editEndDate")?.value
+  };
+
+  if (!payload.monthly_plan) {
+    return showToast("Please select a membership plan", "error");
+  }
+
+  if (payload.discount < 0 || !Number.isFinite(payload.discount)) {
+    return showToast("Please enter a valid discount", "error");
+  }
+
+  if (!payload.start_date || !payload.end_date) {
+    return showToast("Joining and expiry dates are required", "error");
+  }
+
+  const res = await API.put(`/memberships/${membershipId}`, payload);
+
+  if (res?.ok) {
+    showToast("Member updated successfully", "success");
+    closeModal();
+    await loadDashboardStats();
+    await loadMembers();
+  } else {
+    showToast(res?.data?.message || "Failed to update member", "error");
+  }
+}
+
 // ─────────────────────────────────────────────
 //  Status modal
 // ─────────────────────────────────────────────
