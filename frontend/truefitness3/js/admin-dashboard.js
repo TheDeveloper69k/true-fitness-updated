@@ -841,13 +841,30 @@ async function assignMembership(userId, assigned = false) {
 //  Edit Member
 // ─────────────────────────────────────────────
 
+// ─────────────────────────────────────────────
+//  Edit Member
+// ─────────────────────────────────────────────
+
 async function openEditMemberModal(m) {
   await ensurePlansLoaded();
 
   openModal(
     "✏️ Edit Member",
-    `Update membership details for ${m.name || m.full_name || "Member"}`,
+    `Update details for ${m.name || m.full_name || "Member"}`,
     `
+    <div class="form-group">
+      <label>Full Name</label>
+      <input id="editName" type="text"
+        value="${escapeHtml(m.name || m.full_name || "")}" placeholder="Enter full name"/>
+    </div>
+
+    <div class="form-group">
+      <label>Phone Number</label>
+      <input id="editPhone" type="tel" maxlength="10"
+        oninput="this.value=this.value.replace(/\\D/g,'').slice(0,10)"
+        value="${escapeHtml(m.phone || "")}" placeholder="10-digit mobile number"/>
+    </div>
+
     <div class="form-group">
       <label>Membership Plan</label>
       <select id="editPlan"></select>
@@ -896,6 +913,50 @@ async function openEditMemberModal(m) {
 
   const statusSelect = document.getElementById("editStatus");
   if (statusSelect) statusSelect.value = m.status || "active";
+}
+
+async function saveMemberEdit(membershipId) {
+  const payload = {
+    full_name: document.getElementById("editName")?.value?.trim(),
+    phone: document.getElementById("editPhone")?.value?.trim(),
+    monthly_plan: document.getElementById("editPlan")?.value,
+    discount: Number(document.getElementById("editDiscount")?.value),
+    status: document.getElementById("editStatus")?.value,
+    date_of_birth: document.getElementById("editDob")?.value || null,
+    start_date: document.getElementById("editStartDate")?.value,
+    end_date: document.getElementById("editEndDate")?.value
+  };
+
+  if (!payload.full_name || payload.full_name.length < 2) {
+    return showToast("Please enter a valid full name", "error");
+  }
+
+  if (!/^[0-9]{10}$/.test(payload.phone || "")) {
+    return showToast("Phone number must be exactly 10 digits", "error");
+  }
+
+  if (!payload.monthly_plan) {
+    return showToast("Please select a membership plan", "error");
+  }
+
+  if (payload.discount < 0 || !Number.isFinite(payload.discount)) {
+    return showToast("Please enter a valid discount", "error");
+  }
+
+  if (!payload.start_date || !payload.end_date) {
+    return showToast("Joining and expiry dates are required", "error");
+  }
+
+  const res = await API.put(`/memberships/${membershipId}`, payload);
+
+  if (res?.ok) {
+    showToast("Member updated successfully", "success");
+    closeModal();
+    await loadDashboardStats();
+    await loadMembers();
+  } else {
+    showToast(res?.data?.message || "Failed to update member", "error");
+  }
 }
 
 async function saveMemberEdit(membershipId) {

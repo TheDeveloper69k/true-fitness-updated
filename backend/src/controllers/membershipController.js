@@ -765,6 +765,9 @@ exports.modifyMembership = async (req, res) => {
   try {
     const { id } = req.params;
     const {
+      full_name,
+      name,
+      phone,
       monthly_plan,
       discount,
       status,
@@ -797,6 +800,31 @@ exports.modifyMembership = async (req, res) => {
       updated_at: new Date().toISOString(),
     };
 
+    const resolvedName =
+      full_name !== undefined ? String(full_name).trim() :
+        name !== undefined ? String(name).trim() : undefined;
+
+    if (resolvedName !== undefined) {
+      if (!resolvedName) {
+        return res.status(400).json({
+          success: false,
+          message: "Member name cannot be empty",
+        });
+      }
+      updatePayload.full_name = resolvedName;
+    }
+
+    if (phone !== undefined) {
+      const cleanedPhone = String(phone).trim();
+      if (!/^\d{10}$/.test(cleanedPhone)) {
+        return res.status(400).json({
+          success: false,
+          message: "Please enter a valid 10-digit phone number",
+        });
+      }
+      updatePayload.phone = cleanedPhone;
+    }
+
     if (status !== undefined) {
       if (!ALLOWED_STATUS.includes(status)) {
         return res.status(400).json({
@@ -804,7 +832,6 @@ exports.modifyMembership = async (req, res) => {
           message: "Invalid status value",
         });
       }
-
       updatePayload.status = status;
     }
 
@@ -861,6 +888,7 @@ exports.modifyMembership = async (req, res) => {
     }
 
     updatePayload.discount = parsedDiscount;
+    updatePayload.final_amount = Math.max(0, resolvedPlanPrice - parsedDiscount);
 
     const normalizedStartDate =
       start_date !== undefined
@@ -928,6 +956,31 @@ exports.modifyMembership = async (req, res) => {
         message: "Failed to modify membership",
         error: error.message,
       });
+    }
+
+    // Keep the users table and any older membership records in sync
+    if (existingMembership.user_id && (updatePayload.full_name || updatePayload.phone)) {
+      const userTableUpdate = {};
+      const membershipHistoryUpdate = {};
+
+      if (updatePayload.full_name) {
+        userTableUpdate.name = updatePayload.full_name;
+        membershipHistoryUpdate.full_name = updatePayload.full_name;
+      }
+      if (updatePayload.phone) {
+        userTableUpdate.phone = updatePayload.phone;
+        membershipHistoryUpdate.phone = updatePayload.phone;
+      }
+
+      await supabase
+        .from("users")
+        .update(userTableUpdate)
+        .eq("id", existingMembership.user_id);
+
+      await supabase
+        .from("user_memberships")
+        .update(membershipHistoryUpdate)
+        .eq("user_id", existingMembership.user_id);
     }
 
     return res.status(200).json({
