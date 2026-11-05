@@ -888,7 +888,6 @@ exports.modifyMembership = async (req, res) => {
     }
 
     updatePayload.discount = parsedDiscount;
-    updatePayload.final_amount = Math.max(0, resolvedPlanPrice - parsedDiscount);
 
     const normalizedStartDate =
       start_date !== undefined
